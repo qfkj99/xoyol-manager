@@ -1,0 +1,32 @@
+services:
+  app:
+    image: xoyol-manager:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 30s
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${HOST_PORT:-3000}:3000"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      # Fixed container path: a previous non-Docker DB_PATH cannot bypass the mount.
+      DB_PATH: /app/data/outlook.db
+      COOKIE_SECURE: "true"
+      APP_ORIGIN: "${APP_ORIGIN:-}"
+      TRUST_PROXY: "${TRUST_PROXY:-true}"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+      SESSION_HOURS: "${SESSION_HOURS:-12}"
+      REMEMBER_DAYS: "${REMEMBER_DAYS:-7}"
+      PROXY_PRIVATE_HOST_ALLOWLIST: "${PROXY_PRIVATE_HOST_ALLOWLIST:-}"
+    volumes:
+      - type: bind
+        source: ./data
+        target: /app/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

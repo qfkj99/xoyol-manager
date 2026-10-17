@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 import { AlertCircle, XCircle, Clock, Wifi } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { DashboardStats } from '../../types';
+import { useAuthStore } from '../../stores/auth';
 
 interface Props {
   stats: DashboardStats | null;
@@ -9,6 +10,7 @@ interface Props {
 
 export function QuickActions({ stats }: Props) {
   const navigate = useNavigate();
+  const isAdmin = useAuthStore(s => s.user?.role === 'admin');
 
   const actions = [
     {
@@ -52,7 +54,7 @@ export function QuickActions({ stats }: Props) {
         <h2 className="text-sm font-semibold text-foreground">快速操作</h2>
       </div>
       <div className="p-4 grid grid-cols-2 gap-3">
-        {actions.map((action, i) => (
+        {actions.filter(action => action.path !== '/proxy' || isAdmin).map((action, i) => (
           <motion.button
             key={action.label}
             initial={{ opacity: 0, scale: 0.9 }}

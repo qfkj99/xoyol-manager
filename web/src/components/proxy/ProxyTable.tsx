@@ -1,5 +1,7 @@
 import type { Proxy, ProxyTestResult } from '../../types';
 import ProxyTestButton from './ProxyTestButton';
+import { useAuthStore } from '../../stores/auth';
+import { Star } from 'lucide-react';
 
 interface Props {
   proxies: Proxy[];
@@ -26,6 +28,7 @@ function StatusDot({ status }: { status: Proxy['status'] }) {
 }
 
 export default function ProxyTable({ proxies, loading, onEdit, onDelete, onTest, onSetDefault }: Props) {
+  const isAdmin = useAuthStore(s => s.user?.role === 'admin');
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20 text-zinc-400">
@@ -68,8 +71,9 @@ export default function ProxyTable({ proxies, loading, onEdit, onDelete, onTest,
               <td className="py-3 text-zinc-900 dark:text-zinc-100">
                 <span className="inline-flex items-center gap-1.5">
                   {p.name}
-                  {p.is_default && <span className="text-amber-500" title="默认代理">⭐</span>}
+                  {p.is_default && <Star size={14} className="text-amber-600 dark:text-amber-400" aria-label="默认代理" />}
                 </span>
+                {isAdmin && <p className="mt-1 text-xs text-muted-foreground">归属：{p.owner_username || `用户 #${p.owner_user_id}`}</p>}
               </td>
               <td className="py-3">
                 <span className="px-2 py-0.5 text-xs rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 uppercase font-medium">

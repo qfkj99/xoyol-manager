@@ -1,6 +1,17 @@
 // ============ 账户 ============
 export interface Account {
   id: number;
+  owner_user_id: number | null;
+  inventory_admin_id: number | null;
+  has_password?: boolean;
+  has_refresh_token?: boolean;
+  game_account: string;
+  game_password: string;
+  real_name: string;
+  id_last_six: string;
+  claim_status: 'assigned' | 'available';
+  claim_code_expires_at: number | null;
+  claimed_at: string | null;
   email: string;
   password: string;
   client_id: string;
@@ -32,6 +43,8 @@ export interface MailMessage {
 // ============ 代理 ============
 export interface Proxy {
   id: number;
+  owner_user_id: number | null;
+  has_password?: boolean;
   name: string;
   type: 'socks5' | 'http';
   host: string;
@@ -61,14 +74,33 @@ export interface PaginatedResponse<T> {
 
 export interface ImportRequest {
   content: string;
-  separator: string;
-  format: string[];
+  separator?: string;
+  format?: string[];
+  placement?: 'owned' | 'pool';
+  generate_share_links?: boolean;
+}
+
+export interface ClaimCode {
+  account_id: number;
+  game_account: string;
+  code: string;
+  expires_at: string;
 }
 
 export interface ImportResult {
   imported: number;
   skipped: number;
   errors: string[];
+  claim_codes?: ClaimCode[];
+  share_exports?: ImportShareExport[];
+}
+
+export interface ImportShareExport {
+  game_account: string;
+  game_password: string;
+  real_name: string;
+  id_last_six: string;
+  path: string;
 }
 
 export interface ExportRequest {
@@ -109,9 +141,24 @@ export interface FetchMailsResult {
   cached: boolean;
 }
 
+export interface VerificationMail extends Partial<MailMessage> {
+  mailbox: 'INBOX' | 'Junk';
+  cached: boolean;
+}
+
+export interface FetchVerificationMailsResult {
+  mails: VerificationMail[];
+  total: number;
+  protocol: 'graph' | 'imap' | 'mixed';
+  cached: boolean;
+  partial: boolean;
+  warning?: string;
+}
+
 // ============ 标签 ============
 export interface Tag {
   id: number;
+  owner_user_id: number | null;
   name: string;
   color: string;
   created_at: string;

@@ -1,12 +1,16 @@
 import { create } from 'zustand';
 import type { Account, PaginatedResponse, ImportRequest, ImportResult, ExportRequest } from '../types';
-import { accountApi } from '../lib/api';
+import { accountApi, getSessionGeneration } from '../lib/api';
 
+let accountRequestSequence = 0;
 interface AccountStore {
   accounts: Account[];
   loading: boolean;
+  error: string;
   selectedIds: number[];
   searchQuery: string;
+  ownerUserId: number | undefined;
+  claimStatus: 'all' | 'assigned' | 'available';
   pagination: { page: number; pageSize: number; total: number };
   fetchAccounts: () => Promise<void>;
   refreshAccountsSilent: () => Promise<void>;
@@ -18,6 +22,8 @@ interface AccountStore {
   exportAccounts: (req: ExportRequest) => Promise<string>;
   setSelectedIds: (ids: number[]) => void;
   setSearchQuery: (q: string) => void;
+  setOwnerUserId: (id: number | undefined) => void;
+  setClaimStatus: (status: 'all' | 'assigned' | 'available') => void;
   setPage: (page: number) => void;
   setPageSize: (size: number) => void;
 }
@@ -25,30 +31,40 @@ interface AccountStore {
 export const useAccountStore = create<AccountStore>((set, get) => ({
   accounts: [],
   loading: false,
+  error: '',
   selectedIds: [],
   searchQuery: '',
+  ownerUserId: undefined,
+  claimStatus: 'all',
   pagination: { page: 1, pageSize: 20, total: 0 },
 
   fetchAccounts: async () => {
-    set({ loading: true });
+    const generation = getSessionGeneration();
+    const sequence = ++accountRequestSequence;
+    set({ loading: true, error: '' });
     try {
       const { page, pageSize } = get().pagination;
-      const data = await accountApi.list({ page, pageSize, search: get().searchQuery });
-      set({ accounts: data.list, pagination: { page: data.page, pageSize: data.pageSize, total: data.total } });
+      const data = await accountApi.list({ page, pageSize, search: get().searchQuery, owner_user_id: get().ownerUserId, claim_status: get().claimStatus === 'all' ? undefined : get().claimStatus as 'assigned' | 'available' });
+      if (generation === getSessionGeneration() && sequence === accountRequestSequence) set({ accounts: data.list, pagination: { page: data.page, pageSize: data.pageSize, total: data.total } });
+    } catch (error) {
+      if (generation === getSessionGeneration() && sequence === accountRequestSequence) set(state => ({ accounts: [], selectedIds: [], pagination: { ...state.pagination, total: 0 }, error: error instanceof Error ? error.message : '加载游戏账号失败' }));
+      throw error;
     } finally {
-      set({ loading: false });
+      if (generation === getSessionGeneration() && sequence === accountRequestSequence) set({ loading: false });
     }
   },
 
   refreshAccountsSilent: async () => {
+    const generation = getSessionGeneration();
+    const sequence = accountRequestSequence;
     try {
       const { page, pageSize } = get().pagination;
-      const data = await accountApi.list({ page, pageSize, search: get().searchQuery });
+      const data = await accountApi.list({ page, pageSize, search: get().searchQuery, owner_user_id: get().ownerUserId, claim_status: get().claimStatus === 'all' ? undefined : get().claimStatus as 'assigned' | 'available' });
+      if (generation !== getSessionGeneration() || sequence !== accountRequestSequence) return;
       set(state => ({
-        accounts: state.accounts.map(acc => {
-          const fresh = data.list.find(a => a.id === acc.id);
-          return fresh ?? acc;
-        }),
+        accounts: data.list,
+        selectedIds: state.selectedIds.filter(id => data.list.some(account => account.id === id)),
+        pagination: { page: data.page, pageSize: data.pageSize, total: data.total },
       }));
     } catch {
       // 静默失败，不影响用户操作
@@ -61,10 +77,8 @@ export const useAccountStore = create<AccountStore>((set, get) => ({
   },
 
   updateAccount: async (id, data) => {
-    const updated = await accountApi.update(id, data);
-    set(state => ({
-      accounts: state.accounts.map(acc => acc.id === id ? updated : acc),
-    }));
+    await accountApi.update(id, data);
+    await get().fetchAccounts();
   },
 
   deleteAccount: async (id) => {
@@ -80,7 +94,7 @@ export const useAccountStore = create<AccountStore>((set, get) => ({
 
   importAccounts: async (req) => {
     const result = await accountApi.import(req);
-    await get().fetchAccounts();
+    await get().fetchAccounts().catch(() => {});
     return result;
   },
 
@@ -90,7 +104,9 @@ export const useAccountStore = create<AccountStore>((set, get) => ({
   },
 
   setSelectedIds: (ids) => set({ selectedIds: ids }),
-  setSearchQuery: (q) => { set({ searchQuery: q }); get().fetchAccounts(); },
-  setPage: (page) => { set(s => ({ pagination: { ...s.pagination, page } })); get().fetchAccounts(); },
-  setPageSize: (size) => { set(s => ({ pagination: { ...s.pagination, pageSize: size, page: 1 } })); get().fetchAccounts(); },
+  setSearchQuery: (q) => { set(s => ({ searchQuery: q, selectedIds: [], pagination: { ...s.pagination, page: 1 } })); get().fetchAccounts().catch(() => {}); },
+  setOwnerUserId: (id) => { set(s => ({ ownerUserId: id, selectedIds: [], pagination: { ...s.pagination, page: 1 } })); get().fetchAccounts().catch(() => {}); },
+  setClaimStatus: (claimStatus) => { set(s => ({ claimStatus, selectedIds: [], pagination: { ...s.pagination, page: 1 } })); get().fetchAccounts().catch(() => {}); },
+  setPage: (page) => { set(s => ({ selectedIds: [], pagination: { ...s.pagination, page } })); get().fetchAccounts().catch(() => {}); },
+  setPageSize: (size) => { set(s => ({ selectedIds: [], pagination: { ...s.pagination, pageSize: size, page: 1 } })); get().fetchAccounts().catch(() => {}); },
 }));

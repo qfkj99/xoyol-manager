@@ -1,9 +1,13 @@
 .omc/
 node_modules/
 dist/
+/data/*
+!/data/.gitkeep
 server/data/*.db
 server/data/*.db-shm
 server/data/*.db-wal
+server/data/migration-backups/
+server/data/restore-backups/
 *.log
 .env
 .env.local

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { useProxyStore } from '../stores/proxy';
 import type { Proxy } from '../types';
+import { proxyApi } from '../lib/api';
 import ProxyTable from '../components/proxy/ProxyTable';
 import ProxyForm from '../components/proxy/ProxyForm';
 
@@ -19,9 +20,9 @@ export default function ProxySettings() {
     setFormOpen(true);
   };
 
-  const handleEdit = (proxy: Proxy) => {
-    setEditing(proxy);
-    setFormOpen(true);
+  const handleEdit = async (proxy: Proxy) => {
+    try { const detail = await proxyApi.credentials(proxy.id); setEditing(detail); setFormOpen(true); }
+    catch (error) { toast.error(error instanceof Error ? error.message : '加载代理凭据失败，无法编辑'); }
   };
 
   const handleSave = async (data: Partial<Proxy>) => {

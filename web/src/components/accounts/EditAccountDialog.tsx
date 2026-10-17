@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { Account, Tag } from '../../types';
+import { FormError, Modal } from '../auth/FormControls';
 
 interface Props {
   open: boolean;
@@ -14,41 +15,45 @@ interface Props {
 }
 
 export default function EditAccountDialog({ open, account, onClose, onSave, tags = [], accountTagIds = [], onTagToggle, onCreateTag, onDeleteTag }: Props) {
-  const [form, setForm] = useState({ email: '', password: '', client_id: '', refresh_token: '', remark: '' });
+  const blank = { game_account: '', game_password: '', real_name: '', id_last_six: '', email: '', password: '', client_id: '', refresh_token: '', remark: '' };
+  const [form, setForm] = useState(blank);
   const [saving, setSaving] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [newTagName, setNewTagName] = useState('');
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (account) {
-      setForm({ email: account.email, password: account.password, client_id: account.client_id, refresh_token: account.refresh_token, remark: account.remark || '' });
+      setForm({ game_account: account.game_account || '', game_password: account.game_password || '', real_name: account.real_name || '', id_last_six: account.id_last_six || '', email: account.email, password: account.password, client_id: account.client_id, refresh_token: account.refresh_token, remark: account.remark || '' });
     } else {
-      setForm({ email: '', password: '', client_id: '', refresh_token: '', remark: '' });
+      setForm(blank);
     }
     setShowPassword(false);
+    setError('');
   }, [account, open]);
 
   if (!open) return null;
 
   const handleSave = async () => {
-    setSaving(true);
+    if (!form.game_account.trim() || !form.email.trim()) { setError('请填写游戏账号和绑定微软邮箱。'); return; }
+    if (form.id_last_six && !/^\d{5}[\dXx]$/.test(form.id_last_six)) { setError('身份证后六位应为 5 位数字加 1 位数字或 X。'); return; }
+    setSaving(true); setError('');
     try {
       await onSave(form);
       onClose();
+    } catch (error) {
+      setError(error instanceof Error ? error.message : '保存失败，请重试');
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-[fadeIn_0.2s_ease-out]" onClick={onClose}>
-      <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6 animate-[slideUp_0.2s_ease-out]" onClick={e => e.stopPropagation()}>
-        <h2 className="text-lg font-semibold mb-4 text-zinc-900 dark:text-zinc-100">
-          {account ? '编辑邮箱' : '新增邮箱'}
-        </h2>
-        <div className="space-y-3">
+    <Modal title={account ? '编辑游戏账号' : '新增游戏账号'} description="游戏登录信息将以明文显示在账号列表中；绑定邮箱用于获取登录验证码。" onClose={onClose} busy={saving}>
+        <fieldset disabled={saving} className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2">{([['game_account', '游戏账号'], ['game_password', '游戏密码'], ['real_name', 'name / 姓名'], ['id_last_six', '身份证后六位']] as const).map(([field, label]) => <div key={field}><label htmlFor={`edit-${field}`} className="form-label mb-1 block">{label}</label><input id={`edit-${field}`} className="form-input font-mono" autoComplete="off" value={form[field]} onChange={e => setForm(current => ({ ...current, [field]: e.target.value }))} maxLength={field === 'id_last_six' ? 6 : undefined} placeholder={field === 'id_last_six' ? '例如 12345X' : label} /></div>)}</div>
           <div>
-            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">邮箱地址</label>
+            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">绑定微软邮箱</label>
             <input
               type="email"
               value={form.email}
@@ -58,7 +63,7 @@ export default function EditAccountDialog({ open, account, onClose, onSave, tags
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">密码</label>
+            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">邮箱密码</label>
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
@@ -196,16 +201,16 @@ export default function EditAccountDialog({ open, account, onClose, onSave, tags
               </div>
             </div>
           )}
-        </div>
+        </fieldset>
+        <div className="mt-4"><FormError message={error} /></div>
         <div className="flex justify-end gap-2 mt-5">
-          <button onClick={onClose} className="px-4 py-2 text-sm rounded-lg border border-zinc-300 dark:border-zinc-600 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+          <button onClick={onClose} disabled={saving} className="px-4 py-2 text-sm rounded-lg border border-zinc-300 dark:border-zinc-600 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
             取消
           </button>
-          <button onClick={handleSave} disabled={saving || !form.email} className="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+          <button onClick={handleSave} disabled={saving || !form.email || !form.game_account.trim()} className="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
             {saving ? '保存中...' : '保存'}
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

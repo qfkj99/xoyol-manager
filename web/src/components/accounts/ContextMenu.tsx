@@ -59,7 +59,7 @@ export default function ContextMenu({ x, y, account, tags, onClose, onCopyEmail,
 
   const items: MenuItemType[] = [
     { label: '复制邮箱', onClick: onCopyEmail, icon: <CopyIcon /> },
-    { label: '复制密码', onClick: onCopyPassword, icon: <CopyIcon /> },
+    { label: '复制邮箱密码', onClick: onCopyPassword, icon: <CopyIcon /> },
     { label: '复制 Token', onClick: onCopyToken, icon: <CopyIcon /> },
     { separator: true },
     { label: '编辑', onClick: onEdit, icon: <EditIcon /> },

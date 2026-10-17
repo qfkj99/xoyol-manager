@@ -1,6 +1,15 @@
 // ============ 账户 ============
 export interface Account {
   id: number;
+  owner_user_id: number;
+  owner_username?: string;
+  game_account: string;
+  game_password: string;
+  real_name: string;
+  id_last_six: string;
+  claim_status: 'assigned' | 'available';
+  has_password?: boolean;
+  has_refresh_token?: boolean;
   email: string;
   password: string;
   client_id: string;
@@ -17,6 +26,7 @@ export interface Account {
 // ============ 标签 ============
 export interface Tag {
   id: number;
+  owner_user_id: number;
   name: string;
   color: string;
   created_at: string;
@@ -41,6 +51,9 @@ export interface MailMessage {
 // ============ 代理 ============
 export interface Proxy {
   id: number;
+  owner_user_id: number;
+  owner_username?: string;
+  has_password?: boolean;
   name: string;
   type: 'socks5' | 'http';
   host: string;
@@ -72,13 +85,21 @@ export interface ImportRequest {
   content: string;
   separator: string;
   format: string[];
+  placement?: 'owned' | 'pool';
+  generate_share_links?: boolean;
 }
+
+export interface ClaimCode { account_id: number; game_account: string; code: string; expires_at: string }
 
 export interface ImportResult {
   imported: number;
   skipped: number;
   errors: string[];
+  claim_codes?: ClaimCode[];
+  share_exports?: ShareExport[];
 }
+
+export interface ShareExport { game_account: string; game_password: string; real_name: string; id_last_six: string; path: string }
 
 export interface ImportPreviewResult {
   newItems: { line: number; email: string; [key: string]: any }[];
@@ -88,6 +109,7 @@ export interface ImportPreviewResult {
 
 export interface ExportRequest {
   ids?: number[];
+  owner_user_id?: number;
   separator?: string;
   format?: string[];
 }
@@ -122,4 +144,62 @@ export interface FetchMailsResult {
   total: number;
   protocol: 'graph' | 'imap';
   cached: boolean;
+}
+
+export interface VerificationCodeResult {
+  candidates: { code: string; mail_id: string; subject: string; sender: string; mail_date: string; recent: boolean; mailbox: 'INBOX' | 'Junk'; cached: boolean }[];
+  fetched_at: string;
+  cached: boolean;
+  partial: boolean;
+  mailbox: 'ALL';
+  mailboxes: ('INBOX' | 'Junk')[];
+  protocol: 'graph' | 'imap' | 'mixed';
+  warning?: string;
+}
+
+export interface AccountShareLink {
+  enabled: boolean;
+  path?: string;
+  created_at?: string;
+  expires_at?: string | null;
+}
+
+export type SharedAccount = Pick<Account, 'game_account' | 'game_password' | 'real_name' | 'id_last_six' | 'email' | 'password' | 'client_id' | 'refresh_token' | 'remark' | 'status'> & { expires_at: string | null };
+
+export interface User {
+  id: number;
+  username: string;
+  display_name: string;
+  role: 'admin' | 'user';
+  status: 'active' | 'disabled' | 'deleted';
+  must_change_password: boolean;
+  source: 'self' | 'admin';
+  last_login_at: string | null;
+  created_at: string;
+  updated_at?: string;
+  account_count?: number;
+  proxy_count?: number;
+  tag_count?: number;
+}
+
+export interface AuthConfig {
+  initialized: boolean;
+  registration_enabled: boolean;
+  password_min_length: number;
+  password_max_length: number;
+  csrfToken: string;
+}
+
+export interface AuthSession { user: User; csrfToken: string }
+
+export interface AuditLog {
+  id: number;
+  actor_id?: number | null;
+  actor_username?: string | null;
+  action: string;
+  target_type?: string | null;
+  target_id?: string | number | null;
+  result: string;
+  ip?: string;
+  created_at: string;
 }

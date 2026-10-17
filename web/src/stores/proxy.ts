@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { Proxy, ProxyTestResult } from '../types';
-import { proxyApi } from '../lib/api';
+import { proxyApi, getSessionGeneration } from '../lib/api';
 
 interface ProxyStore {
   proxies: Proxy[];
@@ -20,12 +20,13 @@ export const useProxyStore = create<ProxyStore>((set, get) => ({
   testResult: null,
 
   fetchProxies: async () => {
+    const generation = getSessionGeneration();
     set({ loading: true });
     try {
       const data = await proxyApi.list();
       set({ proxies: data });
     } finally {
-      set({ loading: false });
+      if (generation === getSessionGeneration()) set({ loading: false });
     }
   },
 

@@ -5,7 +5,7 @@ import { tagApi } from '../lib/api';
 interface TagStore {
   tags: Tag[];
   fetchTags: () => Promise<void>;
-  createTag: (name: string, color?: string) => Promise<Tag>;
+  createTag: (name: string, color?: string, ownerUserId?: number) => Promise<Tag>;
   updateTag: (id: number, data: { name?: string; color?: string }) => Promise<void>;
   deleteTag: (id: number) => Promise<void>;
   setAccountTags: (accountId: number, tagIds: number[]) => Promise<void>;
@@ -19,8 +19,8 @@ export const useTagStore = create<TagStore>((set) => ({
     set({ tags });
   },
 
-  createTag: async (name, color) => {
-    const tag = await tagApi.create({ name, color });
+  createTag: async (name, color, ownerUserId) => {
+    const tag = await tagApi.create({ name, color, owner_user_id: ownerUserId });
     set(state => ({ tags: [...state.tags, tag] }));
     return tag;
   },

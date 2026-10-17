@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Users, Inbox, AlertTriangle, RefreshCw, Globe } from 'lucide-react';
+import { Users, Inbox, AlertTriangle, RefreshCw, Globe, MailPlus, FolderInput } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { useAuthStore } from '../stores/auth';
 import { dashboardApi } from '../lib/api';
 import type { DashboardStats } from '../types';
 import { StatCard } from '../components/dashboard/StatCard';
@@ -8,6 +10,8 @@ import { QuickActions } from '../components/dashboard/QuickActions';
 import { RecentMails } from '../components/dashboard/RecentMails';
 
 export default function Dashboard() {
+  const user = useAuthStore(s => s.user);
+  const isAdmin = user?.role === 'admin';
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -40,8 +44,8 @@ export default function Dashboard() {
           <div className="h-8 w-32 rounded bg-secondary animate-pulse" />
           <div className="h-9 w-20 rounded bg-secondary animate-pulse" />
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
+        <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${isAdmin ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}>
+          {Array.from({ length: isAdmin ? 4 : 3 }).map((_, i) => (
             <div key={i} className="glass-card p-5 h-24 animate-pulse" />
           ))}
         </div>
@@ -78,7 +82,7 @@ export default function Dashboard() {
   const statCards = [
     {
       icon: Users,
-      label: '邮箱总数',
+      label: '游戏账号总数',
       value: stats.totalAccounts,
       sub: `${stats.activeAccounts} 个活跃`,
       color: '#3B82F6',
@@ -95,13 +99,13 @@ export default function Dashboard() {
       value: stats.totalJunkMails,
       color: '#F59E0B',
     },
-    {
+    ...(isAdmin ? [{
       icon: Globe,
       label: '代理在线数',
       value: stats.activeProxies,
       sub: `共 ${stats.totalProxies} 个代理`,
       color: '#8B5CF6',
-    },
+    }] : []),
   ];
 
   return (
@@ -113,8 +117,8 @@ export default function Dashboard() {
         className="flex items-center justify-between"
       >
         <div>
-          <h1 className="text-2xl font-bold text-foreground">仪表盘</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">邮箱管理系统概览</p>
+          <h1 className="text-2xl font-bold text-foreground">你好，{user?.display_name || user?.username}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{user?.role === 'admin' ? '查看游戏账号、绑定邮箱及代理的运行情况。' : '管理你的游戏账号，快速获取登录验证码。'}</p>
         </div>
         <button
           onClick={() => fetchStats(true)}
@@ -126,8 +130,10 @@ export default function Dashboard() {
         </button>
       </motion.div>
 
-      {/* Stat Cards - 4 columns */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {stats.totalAccounts === 0 && <section className="rounded-lg border border-border bg-card p-6 sm:p-8"><div className="mb-4 flex h-12 w-12 items-center justify-center rounded-md bg-secondary text-primary"><MailPlus size={24} aria-hidden="true" /></div><h2 className="text-xl font-semibold">从第一个游戏账号开始</h2><p className="mb-6 mt-3 max-w-xl text-sm leading-7 text-muted-foreground">{isAdmin ? '批量导入游戏账号及绑定微软邮箱，可生成短链交付给用户。' : '导入管理员提供的账号资料。'}账号登录信息与邮箱验证码会集中显示在账号管理中。</p><div className="flex flex-wrap gap-3">{isAdmin && <Link className="button-primary" to="/accounts?action=add"><MailPlus size={17} aria-hidden="true" />添加游戏账号</Link>}<Link className="button-secondary" to="/accounts?action=import"><FolderInput size={17} aria-hidden="true" />{isAdmin ? '批量导入' : '导入账号'}</Link>{isAdmin && <Link className="button-secondary" to="/accounts?action=claim">认领账号</Link>}</div></section>}
+
+      {/* Stat Cards */}
+      <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${isAdmin ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}>
         {statCards.map((card, i) => (
           <StatCard key={card.label} {...card} delay={i * 0.08} />
         ))}

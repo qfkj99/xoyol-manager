@@ -2,22 +2,23 @@ import { AccountModel } from '../models/Account';
 import { MailCacheModel } from '../models/MailCache';
 import { ProxyModel } from '../models/Proxy';
 import { DashboardStats } from '../types';
+import { AuthUser } from '../types/auth';
 
 const accountModel = new AccountModel();
 const cacheModel = new MailCacheModel();
 const proxyModel = new ProxyModel();
 
 export class DashboardService {
-  getStats(): DashboardStats {
-    const accounts = accountModel.getAll();
-    const proxies = proxyModel.list();
-    const recentMails = cacheModel.getRecent(5);
+  getStats(user: AuthUser, requestedOwner?: unknown): DashboardStats {
+    const accounts = accountModel.getAll(user, requestedOwner);
+    const proxies = proxyModel.list(user, requestedOwner);
+    const recentMails = cacheModel.getRecent(user, 5, requestedOwner);
 
     const accountStats = accounts.map(acc => ({
       account_id: acc.id,
       email: acc.email,
-      inbox_count: cacheModel.countByAccount(acc.id, 'INBOX'),
-      junk_count: cacheModel.countByAccount(acc.id, 'Junk'),
+      inbox_count: cacheModel.countByAccount(user, acc.id, 'INBOX'),
+      junk_count: cacheModel.countByAccount(user, acc.id, 'Junk'),
     }));
 
     const now = Date.now();
@@ -26,8 +27,8 @@ export class DashboardService {
     return {
       totalAccounts: accounts.length,
       activeAccounts: accounts.filter(a => a.status === 'active').length,
-      totalInboxMails: cacheModel.countAll('INBOX'),
-      totalJunkMails: cacheModel.countAll('Junk'),
+      totalInboxMails: cacheModel.countAll(user, 'INBOX', requestedOwner),
+      totalJunkMails: cacheModel.countAll(user, 'Junk', requestedOwner),
       totalProxies: proxies.length,
       activeProxies: proxies.filter(p => p.status === 'active').length,
       recentMails,

@@ -1,4 +1,6 @@
 import Router from 'koa-router';
+import db from '../database';
+import { success } from '../utils/response';
 import { accountRoutes } from './accounts';
 import { mailRoutes } from './mails';
 import { proxyRoutes } from './proxies';
@@ -6,8 +8,18 @@ import { dashboardRoutes } from './dashboard';
 import { authRoutes } from './auth';
 import { tagRoutes } from './tags';
 import { backupRoutes } from './backup';
+import { userRoutes } from './users';
+import { settingsRoutes } from './settings';
+import { auditRoutes } from './audit';
+import { shareRoutes } from './share';
 
 const router = new Router({ prefix: '/api' });
+
+// A container probe must work over loopback HTTP without creating secure cookies.
+router.get('/health', ctx => {
+  db.prepare('SELECT 1').get();
+  success(ctx, { status: 'ok' });
+});
 
 router.use('/accounts', accountRoutes.routes(), accountRoutes.allowedMethods());
 router.use('/mails', mailRoutes.routes(), mailRoutes.allowedMethods());
@@ -16,5 +28,9 @@ router.use('/dashboard', dashboardRoutes.routes(), dashboardRoutes.allowedMethod
 router.use('/auth', authRoutes.routes(), authRoutes.allowedMethods());
 router.use('/tags', tagRoutes.routes(), tagRoutes.allowedMethods());
 router.use('/backup', backupRoutes.routes(), backupRoutes.allowedMethods());
+router.use('/users', userRoutes.routes(), userRoutes.allowedMethods());
+router.use('/settings', settingsRoutes.routes(), settingsRoutes.allowedMethods());
+router.use('/audit', auditRoutes.routes(), auditRoutes.allowedMethods());
+router.use('/share', shareRoutes.routes(), shareRoutes.allowedMethods());
 
 export default router;

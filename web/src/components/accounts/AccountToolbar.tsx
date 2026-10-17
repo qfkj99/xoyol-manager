@@ -13,9 +13,10 @@ interface Props {
   onDeleteAll: () => void;
   visibleColumns: string[];
   onColumnsChange: (cols: string[]) => void;
+  showClaimStatus?: boolean;
 }
 
-function ColumnSettingsDropdown({ visibleColumns, onColumnsChange }: { visibleColumns: string[]; onColumnsChange: (cols: string[]) => void }) {
+function ColumnSettingsDropdown({ visibleColumns, onColumnsChange, showClaimStatus }: { visibleColumns: string[]; onColumnsChange: (cols: string[]) => void; showClaimStatus: boolean }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -50,7 +51,7 @@ function ColumnSettingsDropdown({ visibleColumns, onColumnsChange }: { visibleCo
       {open && (
         <div className="absolute right-0 top-full mt-1 z-50 w-48 bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 shadow-lg py-1">
           <div className="px-3 py-1.5 text-xs font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">显示列</div>
-          {ALL_COLUMNS.map(col => (
+          {ALL_COLUMNS.filter(col => col.key !== 'claim_status' || showClaimStatus).map(col => (
             <label
               key={col.key}
               className="flex items-center gap-2 px-3 py-1.5 hover:bg-zinc-50 dark:hover:bg-zinc-700/50 cursor-pointer text-sm text-zinc-700 dark:text-zinc-300"
@@ -74,7 +75,7 @@ export default function AccountToolbar({
   searchQuery, onSearchChange, selectedCount,
   onFileImport, onPasteImport, onExportSelected, onExportAll,
   onDeleteSelected, onDeleteAll,
-  visibleColumns, onColumnsChange,
+  visibleColumns, onColumnsChange, showClaimStatus = false,
 }: Props) {
   return (
     <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2">
@@ -87,7 +88,8 @@ export default function AccountToolbar({
           type="text"
           value={searchQuery}
           onChange={e => onSearchChange(e.target.value)}
-          placeholder="搜索邮箱..."
+          placeholder="搜索游戏账号、name 或邮箱..."
+          aria-label="搜索游戏账号、name 或邮箱"
           className="w-full pl-9 pr-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
@@ -96,11 +98,11 @@ export default function AccountToolbar({
         {/* Import buttons */}
         <button onClick={onFileImport} className="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border border-zinc-300 dark:border-zinc-600 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3-3m0 0l3 3m-3-3v12" /></svg>
-          <span className="hidden sm:inline">文件导入</span>
+          <span>文件导入</span>
         </button>
         <button onClick={onPasteImport} className="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border border-zinc-300 dark:border-zinc-600 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
-          <span className="hidden sm:inline">粘贴导入</span>
+          <span>粘贴导入</span>
         </button>
 
         {/* Divider */}
@@ -125,15 +127,14 @@ export default function AccountToolbar({
           <span className="hidden sm:inline">删除选中{selectedCount > 0 && ` (${selectedCount})`}</span>
         </button>
         <button onClick={onDeleteAll} className="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
-          <span className="hidden sm:inline">全部删除</span>
-          <span className="sm:hidden">删除</span>
+          <span>删除当前页</span>
         </button>
 
         {/* Divider */}
         <div className="hidden sm:block w-px h-6 bg-zinc-200 dark:bg-zinc-700 mx-1" />
 
         {/* Column settings */}
-        <ColumnSettingsDropdown visibleColumns={visibleColumns} onColumnsChange={onColumnsChange} />
+        <ColumnSettingsDropdown visibleColumns={visibleColumns} onColumnsChange={onColumnsChange} showClaimStatus={showClaimStatus} />
       </div>
     </div>
   );

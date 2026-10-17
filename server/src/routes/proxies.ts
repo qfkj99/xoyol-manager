@@ -5,6 +5,7 @@ export const proxyRoutes = new Router();
 const ctrl = new ProxyController();
 
 proxyRoutes.get('/', ctrl.list);
+proxyRoutes.get('/:id/credentials', ctrl.credentials);
 proxyRoutes.post('/', ctrl.create);
 proxyRoutes.put('/:id', ctrl.update);
 proxyRoutes.delete('/:id', ctrl.delete);

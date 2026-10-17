@@ -1,11 +1,15 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, Globe, Mail, X } from 'lucide-react';
+import { LayoutDashboard, Users, Globe, Gamepad2, X, Settings, UserRound } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { useAuthStore } from '../../stores/auth';
 
 const navItems = [
-  { to: '/dashboard', icon: LayoutDashboard, label: '仪表盘' },
-  { to: '/accounts', icon: Users, label: '邮箱管理' },
-  { to: '/proxy', icon: Globe, label: '代理设置' },
+  { to: '/dashboard', icon: LayoutDashboard, label: '工作台', admin: false },
+  { to: '/accounts', icon: Gamepad2, label: '账号管理', admin: false },
+  { to: '/proxy', icon: Globe, label: '代理设置', admin: true },
+  { to: '/profile', icon: UserRound, label: '个人中心', admin: false },
+  { to: '/users', icon: Users, label: '用户管理', admin: true },
+  { to: '/settings', icon: Settings, label: '系统设置', admin: true },
 ];
 
 interface Props {
@@ -14,6 +18,7 @@ interface Props {
 }
 
 export function AppSidebar({ open, onClose }: Props) {
+  const user = useAuthStore(s => s.user);
   return (
     <>
       {/* Mobile overlay */}
@@ -27,16 +32,16 @@ export function AppSidebar({ open, onClose }: Props) {
         <div className="flex h-14 items-center justify-between px-4 border-b border-border">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-              <Mail className="h-4 w-4 text-primary-foreground" />
+              <Gamepad2 className="h-4 w-4 text-primary-foreground" />
             </div>
-            <span className="font-semibold text-foreground">Outlook 管理器</span>
+            <span className="font-semibold text-foreground">小师妹账号管理平台</span>
           </div>
-          <button onClick={onClose} className="md:hidden p-1 rounded-md hover:bg-secondary transition-colors">
+          <button onClick={onClose} aria-label="关闭导航菜单" className="md:hidden flex h-11 w-11 items-center justify-center rounded-md hover:bg-secondary transition-colors">
             <X className="h-4 w-4 text-muted-foreground" />
           </button>
         </div>
         <nav className="flex-1 p-3 space-y-1">
-          {navItems.map((item) => (
+          {navItems.filter(item => (!item.admin || user?.role === 'admin') && (!user?.must_change_password || item.to === '/profile')).map((item) => (
             <NavLink
               key={item.to}
               to={item.to}

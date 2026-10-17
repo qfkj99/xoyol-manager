@@ -1,146 +1,72 @@
 import Imap from 'node-imap';
 import { simpleParser } from 'mailparser';
-import { MailMessage } from '../types';
-import logger from '../utils/logger';
+import { MailMessage, Proxy } from '../types';
+import { ProxyService } from './ProxyService';
+
+const proxyService = new ProxyService();
 
 export class ImapService {
-  generateAuthString(email: string, accessToken: string): string {
-    const authString = `user=${email}\x01auth=Bearer ${accessToken}\x01\x01`;
-    return Buffer.from(authString).toString('base64');
-  }
+  generateAuthString(email: string, accessToken: string): string { return Buffer.from(`user=${email}\x01auth=Bearer ${accessToken}\x01\x01`).toString('base64'); }
 
-  fetchMails(email: string, authString: string, mailbox = 'INBOX', top = 50): Promise<Partial<MailMessage>[]> {
-    return new Promise((resolve, reject) => {
+  private async withConnection<T>(email: string, authString: string, proxy: Proxy | undefined, work: (imap: Imap) => Promise<T>): Promise<T> {
+    const socket = await proxyService.createImapTunnel(proxy);
+    if (socket) {
+      // node-imap calls connect() even for an already connected socket. Keep this
+      // dedicated tunnel connected to the vetted proxy instead of dialing again.
+      socket.connect = (() => socket) as typeof socket.connect;
+    }
+    return new Promise<T>((resolve, reject) => {
       const imap = new Imap({
-        user: email,
-        password: '',
-        xoauth2: authString,
-        host: 'outlook.office365.com',
-        port: 993,
-        tls: true,
-        tlsOptions: { rejectUnauthorized: false },
+        user: email, password: '', xoauth2: authString, host: 'outlook.office365.com', port: 993,
+        tls: true, tlsOptions: { rejectUnauthorized: true, servername: 'outlook.office365.com' },
+        connTimeout: 20000, authTimeout: 20000, socketTimeout: 30000, socket,
       } as any);
-
-      const emailList: Partial<MailMessage>[] = [];
-      let messageCount = 0;
-      let processedCount = 0;
-
-      imap.once('ready', async () => {
-        try {
-          await new Promise<void>((res, rej) => {
-            imap.openBox(mailbox, true, (err) => (err ? rej(err) : res()));
-          });
-
-          const results: number[] = await new Promise((res, rej) => {
-            imap.search(['ALL'], (err, results) => {
-              if (err) return rej(err);
-              const sliced = results.slice(-Math.min(top, results.length));
-              res(sliced);
-            });
-          });
-
-          if (results.length === 0) {
-            imap.end();
-            return;
-          }
-
-          messageCount = results.length;
-          const f = imap.fetch(results, { bodies: '' });
-
-          f.on('message', (msg) => {
-            msg.on('body', (stream) => {
-              simpleParser(stream as any)
-                .then((mail) => {
-                  emailList.push({
-                    sender: mail.from?.text || '',
-                    sender_name: mail.from?.value?.[0]?.name || '',
-                    subject: mail.subject || '',
-                    text_content: mail.text || '',
-                    html_content: mail.html || '',
-                    mail_date: mail.date?.toISOString() || '',
-                  });
-                })
-                .catch((err) => logger.error(`Error parsing email: ${err.message}`))
-                .finally(() => {
-                  processedCount++;
-                  if (processedCount === messageCount) imap.end();
-                });
-            });
-          });
-
-          f.once('error', (err) => {
-            logger.error(`IMAP fetch error: ${err.message}`);
-            reject(err);
-            imap.end();
-          });
-        } catch (err: any) {
-          logger.error(`IMAP ready error: ${err.message}`);
-          reject(err);
-          imap.end();
-        }
+      let finished = false;
+      const fail = (error: Error) => {
+        if (finished) return;
+        finished = true;
+        imap.destroy(); socket?.destroy(); reject(error);
+      };
+      imap.once('error', fail);
+      imap.once('close', () => { if (!finished) fail(new Error('IMAP connection closed before completion')); });
+      imap.once('end', () => { if (!finished) fail(new Error('IMAP connection ended before completion')); });
+      imap.once('ready', () => {
+        work(imap).then(result => { if (!finished) { finished = true; imap.end(); resolve(result); } }, fail);
       });
-
-      imap.once('error', (err: Error) => {
-        logger.error(`IMAP connection error: ${err.message}`);
-        reject(err);
-      });
-
-      imap.once('end', () => {
-        logger.info(`IMAP fetched ${emailList.length} mails`);
-        resolve(emailList);
-      });
-
-      imap.connect();
+      try { imap.connect(); } catch (error) { fail(error as Error); }
     });
   }
 
-  clearMailbox(email: string, authString: string, mailbox = 'INBOX'): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const imap = new Imap({
-        user: email,
-        password: '',
-        xoauth2: authString,
-        host: 'outlook.office365.com',
-        port: 993,
-        tls: true,
-        tlsOptions: { rejectUnauthorized: false },
-      } as any);
-
-      imap.once('ready', async () => {
-        try {
-          await new Promise<void>((res, rej) => {
-            imap.openBox(mailbox, false, (err) => (err ? rej(err) : res()));
+  async fetchMails(email: string, authString: string, mailbox = 'INBOX', top = 50, proxy?: Proxy): Promise<Partial<MailMessage>[]> {
+    return this.withConnection(email, authString, proxy, async imap => {
+      await new Promise<void>((resolve, reject) => imap.openBox(mailbox, true, error => error ? reject(error) : resolve()));
+      const ids = await new Promise<number[]>((resolve, reject) => imap.search(['ALL'], (error, results) => error ? reject(error) : resolve(results.slice(-top))));
+      if (!ids.length) return [];
+      return new Promise<Partial<MailMessage>[]>((resolve, reject) => {
+        const parsed: Promise<Partial<MailMessage>>[] = [];
+        const fetch = imap.fetch(ids, { bodies: '' });
+        fetch.on('message', message => {
+          message.on('body', stream => {
+            const pending = simpleParser(stream as any).then(mail => ({
+              mail_id: mail.messageId || '', sender: mail.from?.value?.[0]?.address || '', sender_name: mail.from?.value?.[0]?.name || '',
+              subject: mail.subject || '', text_content: mail.text || '', html_content: mail.html || '', mail_date: mail.date?.toISOString() || '',
+            }));
+            pending.catch(reject); parsed.push(pending);
           });
-
-          const results: number[] = await new Promise((res, rej) => {
-            imap.search(['ALL'], (err, results) => (err ? rej(err) : res(results)));
-          });
-
-          if (results.length === 0) {
-            imap.end();
-            return;
-          }
-
-          await new Promise<void>((res, rej) => {
-            imap.addFlags(results, ['\\Deleted'], (err) => (err ? rej(err) : res()));
-          });
-
-          await new Promise<void>((res, rej) => {
-            imap.expunge((err) => (err ? rej(err) : res()));
-          });
-
-          logger.info(`IMAP cleared ${results.length} mails from ${mailbox}`);
-          imap.end();
-        } catch (err: any) {
-          logger.error(`IMAP clear error: ${err.message}`);
-          reject(err);
-          imap.end();
-        }
+        });
+        fetch.once('error', reject);
+        fetch.once('end', () => { Promise.all(parsed).then(mails => resolve(mails.sort((a, b) => String(b.mail_date).localeCompare(String(a.mail_date)))), reject); });
       });
+    });
+  }
 
-      imap.once('error', (err: Error) => reject(err));
-      imap.once('end', () => resolve());
-      imap.connect();
+  async clearMailbox(email: string, authString: string, mailbox = 'INBOX', proxy?: Proxy): Promise<void> {
+    await this.withConnection(email, authString, proxy, async imap => {
+      await new Promise<void>((resolve, reject) => imap.openBox(mailbox, false, error => error ? reject(error) : resolve()));
+      const ids = await new Promise<number[]>((resolve, reject) => imap.search(['ALL'], (error, results) => error ? reject(error) : resolve(results)));
+      if (!ids.length) return;
+      await new Promise<void>((resolve, reject) => imap.addFlags(ids, ['\\Deleted'], error => error ? reject(error) : resolve()));
+      await new Promise<void>((resolve, reject) => imap.expunge(error => error ? reject(error) : resolve()));
     });
   }
 }

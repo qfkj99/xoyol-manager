@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { Proxy } from '../../types';
+import { FormError } from '../auth/FormControls';
 
 interface Props {
   open: boolean;
@@ -13,8 +14,10 @@ const initialForm = { name: '', type: 'socks5' as 'socks5' | 'http', host: '', p
 export default function ProxyForm({ open, proxy, onClose, onSave }: Props) {
   const [form, setForm] = useState(initialForm);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
+    setError('');
     if (proxy) {
       setForm({
         name: proxy.name,
@@ -33,10 +36,12 @@ export default function ProxyForm({ open, proxy, onClose, onSave }: Props) {
   if (!open) return null;
 
   const handleSave = async () => {
-    setSaving(true);
+    setSaving(true); setError('');
     try {
       await onSave(form);
       onClose();
+    } catch (error) {
+      setError(error instanceof Error ? error.message : '保存失败，请重试');
     } finally {
       setSaving(false);
     }
@@ -51,6 +56,7 @@ export default function ProxyForm({ open, proxy, onClose, onSave }: Props) {
         <h2 className="text-lg font-semibold mb-4 text-zinc-900 dark:text-zinc-100">
           {proxy ? '编辑代理' : '添加代理'}
         </h2>
+        <FormError message={error} />
         <div className="space-y-3">
           <div>
             <label className={labelCls}>名称</label>

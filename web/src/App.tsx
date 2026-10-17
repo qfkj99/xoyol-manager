@@ -1,53 +1,64 @@
-import { useEffect, useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { AppLayout } from './components/layout/AppLayout';
 import Dashboard from './pages/Dashboard';
 import Accounts from './pages/Accounts';
 import ProxySettings from './pages/ProxySettings';
-import { LoginDialog } from './components/auth/LoginDialog';
-import { authApi } from './lib/api';
+import AuthPage from './pages/AuthPage';
+import Profile from './pages/Profile';
+import Users from './pages/Users';
+import Settings from './pages/Settings';
+import SharedAccount from './pages/SharedAccount';
+import { useAuthStore } from './stores/auth';
+import { FormError } from './components/auth/FormControls';
+import { useAccountStore } from './stores/accounts';
+import { useMailStore } from './stores/mails';
+import { useProxyStore } from './stores/proxy';
+import { useTagStore } from './stores/tags';
+
+window.addEventListener('session-reset', () => {
+  useAccountStore.setState({ accounts: [], loading: false, error: '', selectedIds: [], searchQuery: '', ownerUserId: undefined, claimStatus: 'all', pagination: { page: 1, pageSize: 20, total: 0 } });
+  useMailStore.setState({ currentAccountId: null, currentMailbox: 'INBOX', mails: [], selectedMail: null, loading: false, fetchResult: null });
+  useProxyStore.setState({ proxies: [], loading: false, testResult: null });
+  useTagStore.setState({ tags: [] });
+});
+
+function ProtectedRoute({ admin = false }: { admin?: boolean }) {
+  const user = useAuthStore(s => s.user);
+  const location = useLocation();
+  if (!user) return <Navigate to={`/login?returnTo=${encodeURIComponent(location.pathname + location.search)}`} replace />;
+  if (user.must_change_password && location.pathname !== '/profile') return <Navigate to="/profile" replace />;
+  if (admin && user.role !== 'admin') return <Navigate to="/dashboard" replace />;
+  return <Outlet />;
+}
+
+function AppRoutes() {
+  const user = useAuthStore(s => s.user);
+  return <Routes>
+    <Route path="/" element={<AuthPage />} />
+    <Route path="/login" element={<AuthPage />} />
+    <Route path="/register" element={<AuthPage register />} />
+    <Route element={<ProtectedRoute />}>
+      <Route element={<AppLayout key={user?.id} />}>
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/accounts" element={<Accounts />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route element={<ProtectedRoute admin />}><Route path="/proxy" element={<ProxySettings />} /><Route path="/users" element={<Users />} /><Route path="/settings" element={<Settings />} /></Route>
+      </Route>
+    </Route>
+    <Route path="*" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />
+  </Routes>;
+}
+
+function PlatformApp() {
+  const { checking, error, initialize } = useAuthStore();
+  useEffect(() => { void initialize(); }, [initialize]);
+  if (checking) return <div className="flex min-h-dvh items-center justify-center bg-background text-muted-foreground" role="status">正在连接工作台…</div>;
+  if (error) return <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-5 px-5"><h1 className="text-2xl font-semibold">暂时无法连接</h1><FormError message={error} /><button className="button-primary" onClick={() => void initialize()}>重新连接</button></div>;
+  return <AppRoutes />;
+}
 
 export default function App() {
-  const [authRequired, setAuthRequired] = useState(false);
-  const [showLogin, setShowLogin] = useState(false);
-  const [checking, setChecking] = useState(true);
-
-  useEffect(() => {
-    checkAuth();
-    window.addEventListener('auth-required', () => setShowLogin(true));
-  }, []);
-
-  const checkAuth = async () => {
-    try {
-      const result = await authApi.check();
-      setAuthRequired(result.required);
-      if (result.required && !localStorage.getItem('auth_token')) {
-        setShowLogin(true);
-      }
-    } catch {
-      // 忽略错误
-    } finally {
-      setChecking(false);
-    }
-  };
-
-  if (checking) {
-    return <div className="flex items-center justify-center h-screen">加载中...</div>;
-  }
-
-  return (
-    <BrowserRouter>
-      <Toaster position="top-right" richColors closeButton />
-      {authRequired && <LoginDialog open={showLogin} onSuccess={() => setShowLogin(false)} />}
-      <Routes>
-        <Route element={<AppLayout />}>
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/accounts" element={<Accounts />} />
-          <Route path="/proxy" element={<ProxySettings />} />
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
-  );
+  return <BrowserRouter><Toaster position="top-right" richColors closeButton /><Routes><Route path="/s/:token" element={<SharedAccount />} /><Route path="*" element={<PlatformApp />} /></Routes></BrowserRouter>;
 }

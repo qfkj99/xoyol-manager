@@ -50,9 +50,19 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  :focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+  button, a, select, input[type='checkbox'] { touch-action: manipulation; }
+  button:not(:disabled), a, select { cursor: pointer; }
+  button:disabled { cursor: not-allowed; }
 }
 
 @layer components {
+  .form-label { @apply block text-sm font-medium text-foreground; }
+  .form-input { @apply min-h-11 w-full rounded-md border border-border bg-background px-3 py-2.5 text-base text-foreground disabled:opacity-60; }
+  .form-input:focus { outline: 2px solid var(--ring); outline-offset: 1px; }
+  .button-primary { @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:opacity-90 disabled:opacity-50; }
+  .button-secondary { @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary disabled:opacity-50; }
   .glass-card {
     @apply rounded-lg border;
     background: rgba(15, 23, 42, 0.6);
@@ -72,6 +82,12 @@
     border-color: rgba(255, 255, 255, 0.1);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   }
+}
+
+/* Scrollbar */
+.auth-mail-illustration { max-width: 31rem; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }
 
 /* Scrollbar */

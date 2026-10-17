@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { MailMessage, FetchMailsResult } from '../types';
-import { mailApi } from '../lib/api';
+import { mailApi, getSessionGeneration } from '../lib/api';
 import { useAccountStore } from './accounts';
 
 interface MailStore {
@@ -18,7 +18,8 @@ interface MailStore {
   selectMail: (mail: MailMessage | null) => void;
 }
 
-export const useMailStore = create<MailStore>((set) => ({
+let mailRequestSequence = 0;
+export const useMailStore = create<MailStore>((set, get) => ({
   currentAccountId: null,
   currentMailbox: 'INBOX',
   mails: [],
@@ -26,34 +27,38 @@ export const useMailStore = create<MailStore>((set) => ({
   loading: false,
   fetchResult: null,
 
-  setCurrentAccount: (id) => set({ currentAccountId: id, mails: [], selectedMail: null }),
-  setMailbox: (box) => set({ currentMailbox: box, mails: [], selectedMail: null }),
+  setCurrentAccount: (id) => { mailRequestSequence++; set({ currentAccountId: id, mails: [], selectedMail: null, loading: false }); },
+  setMailbox: (box) => { mailRequestSequence++; set({ currentMailbox: box, mails: [], selectedMail: null, loading: false }); },
 
   fetchMails: async (accountId, mailbox, proxyId) => {
+    const generation = getSessionGeneration(); const sequence = ++mailRequestSequence;
     set({ loading: true });
     try {
       const result = await mailApi.fetch({ account_id: accountId, mailbox, proxy_id: proxyId });
+      if (generation !== getSessionGeneration() || sequence !== mailRequestSequence) return;
       set({ mails: result.mails, fetchResult: result });
       // 无感刷新账户状态
       useAccountStore.getState().refreshAccountsSilent();
     } finally {
-      set({ loading: false });
+      if (generation === getSessionGeneration() && sequence === mailRequestSequence) set({ loading: false });
     }
   },
 
   fetchCachedMails: async (accountId, mailbox) => {
+    const generation = getSessionGeneration(); const sequence = ++mailRequestSequence;
     set({ loading: true });
     try {
       const data = await mailApi.cached({ account_id: accountId, mailbox, pageSize: 100 });
+      if (generation !== getSessionGeneration() || sequence !== mailRequestSequence) return;
       set({ mails: data.list });
     } finally {
-      set({ loading: false });
+      if (generation === getSessionGeneration() && sequence === mailRequestSequence) set({ loading: false });
     }
   },
 
   clearMailbox: async (accountId, mailbox, proxyId) => {
     await mailApi.clear({ account_id: accountId, mailbox, proxy_id: proxyId });
-    set({ mails: [], selectedMail: null });
+    if (get().currentAccountId === accountId && get().currentMailbox === mailbox) set({ mails: [], selectedMail: null });
     useAccountStore.getState().refreshAccountsSilent();
   },
 
