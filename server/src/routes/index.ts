@@ -12,6 +12,8 @@ import { userRoutes } from './users';
 import { settingsRoutes } from './settings';
 import { auditRoutes } from './audit';
 import { shareRoutes } from './share';
+import { apiKeyRoutes } from './apiKeys';
+import { externalRoutes } from './external';
 
 const router = new Router({ prefix: '/api' });
 
@@ -32,5 +34,7 @@ router.use('/users', userRoutes.routes(), userRoutes.allowedMethods());
 router.use('/settings', settingsRoutes.routes(), settingsRoutes.allowedMethods());
 router.use('/audit', auditRoutes.routes(), auditRoutes.allowedMethods());
 router.use('/share', shareRoutes.routes(), shareRoutes.allowedMethods());
+router.use('/api-keys', apiKeyRoutes.routes(), apiKeyRoutes.allowedMethods());
+router.use('/external/v1', externalRoutes.routes(), externalRoutes.allowedMethods());
 
 export default router;

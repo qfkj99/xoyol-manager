@@ -3,6 +3,9 @@ import logger from '../utils/logger';
 
 /** Capability URLs must not appear in application access or error logs. */
 export function requestUrlForLog(ctx: Context): string {
+  // Keys belong in Authorization headers. Discard query strings even when a
+  // caller accidentally sends a credential in a URL instead.
+  if (/^\/api\/(?:external|api-keys)(?:\/|$)/i.test(ctx.path)) return ctx.path;
   if (/^\/api\/share(?:\/|$)/.test(ctx.path)) return '/api/share/[redacted]';
   if (/^\/s(?:\/|$)/.test(ctx.path)) return '/s/[redacted]';
   return ctx.url;

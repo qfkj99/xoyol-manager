@@ -16,6 +16,7 @@ interface ShareLinkRecord {
   owner_user_id: number;
   created_at: string;
   expires_at: number | null;
+  last_accessed_at: number | null;
 }
 
 export interface ShareLinkInfo {
@@ -66,6 +67,18 @@ export class ShareLinkModel {
     accounts.getById(user, accountId);
     db.prepare('DELETE FROM account_share_links WHERE account_id=?').run(accountId);
     return { enabled: false };
+  }
+
+  resolveAndRecordAccess(rawToken: unknown): ReturnType<ShareLinkModel['resolve']> {
+    // Keep validation and the write together. Resolving a link elsewhere (for
+    // example, while fetching mail) must not create a page visit.
+    return db.transaction(() => {
+      const resolved = this.resolve(rawToken);
+      const accessedAt = Date.now();
+      db.prepare('UPDATE account_share_links SET last_accessed_at=? WHERE id=?')
+        .run(accessedAt, resolved.link.id);
+      return { ...resolved, link: { ...resolved.link, last_accessed_at: accessedAt } };
+    }).immediate();
   }
 
   resolve(rawToken: unknown): { link: ShareLinkRecord; account: Account; user: AuthUser } {

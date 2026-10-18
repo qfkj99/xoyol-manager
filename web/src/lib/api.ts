@@ -1,5 +1,6 @@
 import type { ApiResponse, PaginatedResponse, Account, MailMessage, Proxy, ImportRequest, ImportResult, ExportRequest, DashboardStats, ProxyTestResult, FetchMailsResult, Tag, ImportPreviewResult } from '../types';
 import type { AuthConfig, AuthSession, User, AuditLog, ClaimCode, VerificationCodeResult, AccountShareLink, SharedAccount } from '../types';
+import type { ApiKeyInfo, CreateApiKeyRequest } from '../types';
 
 const API_BASE = '/api';
 let csrfToken = '';
@@ -159,6 +160,12 @@ export const settingsApi = {
   update: (registration_enabled: boolean) => request<SystemSettings>('/settings', { method: 'PATCH', body: JSON.stringify({ registration_enabled }) }),
   updateShortLinkLength: (short_link_length: number) => request<SystemSettings>('/settings', { method: 'PATCH', body: JSON.stringify({ short_link_length }) }),
   audit: (page = 1, pageSize = 20) => request<PaginatedResponse<AuditLog>>(`/audit?${qs({ page, pageSize })}`),
+};
+
+export const apiKeyApi = {
+  list: (signal?: AbortSignal) => request<{ list: ApiKeyInfo[] }>('/api-keys', { cache: 'no-store', signal }),
+  create: (data: CreateApiKeyRequest) => request<{ key: string; api_key: ApiKeyInfo }>('/api-keys', { method: 'POST', body: JSON.stringify(data) }),
+  revoke: (id: number) => request<{ revoked: boolean; api_key: ApiKeyInfo }>(`/api-keys/${id}`, { method: 'DELETE' }),
 };
 
 export const tagApi = {

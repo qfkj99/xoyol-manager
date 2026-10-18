@@ -18,6 +18,10 @@ export interface Account {
   status: 'active' | 'inactive' | 'error';
   last_synced_at: string | null;
   token_refreshed_at: string | null;
+  /** 管理员账号列表专用：短链是否当前有效。 */
+  share_link_enabled?: boolean;
+  /** 管理员账号列表专用：短链最近一次被访问的时间。 */
+  share_link_last_accessed_at?: string | null;
   created_at: string;
   updated_at: string;
   tags: Tag[];
@@ -202,4 +206,25 @@ export interface AuditLog {
   result: string;
   ip?: string;
   created_at: string;
+}
+
+export type ApiKeyScope = 'accounts:read' | 'accounts:import' | 'share-links:write' | 'mail:read';
+
+export interface ApiKeyInfo {
+  id: number;
+  name: string;
+  prefix: string;
+  scopes: ApiKeyScope[];
+  created_by: number;
+  creator_username: string;
+  created_at: string;
+  expires_at: string | null;
+  revoked_at: string | null;
+  last_used_at: string | null;
+}
+
+export interface CreateApiKeyRequest {
+  name: string;
+  scopes: ApiKeyScope[];
+  expires_in_days: 7 | 30 | 90 | 365 | null;
 }

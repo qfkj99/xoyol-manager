@@ -2,6 +2,7 @@ import { Context, Next } from 'koa';
 import { AuthUser } from '../types/auth';
 import { userModel } from '../models/User';
 import { assertCsrf, sessionUser } from '../services/session';
+import { externalApiAuth, isExternalApiPath } from './apiKey';
 
 export function getUser(ctx: Context): AuthUser {
   // Revalidate after asynchronous work as well as at the request boundary.
@@ -19,8 +20,12 @@ export function assertAdmin(ctx: Context): AuthUser {
 }
 
 export async function authMiddleware(ctx: Context, next: Next) {
-  if (!(ctx.path === '/api' || ctx.path.startsWith('/api/'))) return next();
+  if (!/^\/api(?:\/|$)/i.test(ctx.path)) return next();
   ctx.set('Cache-Control', 'no-store');
+  // koa-router matches case-insensitively. Reject alternate prefix casing so
+  // those routes cannot bypass the session, CSRF or password-change checks.
+  if (!(ctx.path === '/api' || ctx.path.startsWith('/api/'))) ctx.throw(404, '接口不存在');
+  if (isExternalApiPath(ctx.path)) return externalApiAuth(ctx, next);
   const publicShareRead = ctx.method === 'GET' && /^\/api\/share\/[^/]+$/.test(ctx.path);
   const publicShareCode = ctx.method === 'POST' && /^\/api\/share\/[^/]+\/verification-code$/.test(ctx.path);
   if (publicShareRead || publicShareCode) return next();

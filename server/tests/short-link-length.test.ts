@@ -105,12 +105,13 @@ test('administrator short-link length applies across generation, delivery, impor
       assert.equal((await settings()).data.short_link_length, 8);
     });
     await t.test('changing length preserves old URLs and valid exported links while new links use the maximum', async () => {
-      const snapshots = [legacy.id, short.id].map(id => db.prepare('SELECT * FROM account_share_links WHERE account_id=?').get(id));
+      const deliveredLink = (id: number) => db.prepare('SELECT id,account_id,token,owner_user_id,created_at,expires_at FROM account_share_links WHERE account_id=?').get(id);
+      const snapshots = [legacy.id, short.id].map(deliveredLink);
       await setLength(64);
       assert.equal((await settings()).data.registration_enabled, true);
       assert.equal((await publicDetails(legacy.path)).status, 200);
       assert.equal((await publicDetails(short.path)).status, 200);
-      assert.deepEqual([legacy.id, short.id].map(id => db.prepare('SELECT * FROM account_share_links WHERE account_id=?').get(id)), snapshots);
+      assert.deepEqual([legacy.id, short.id].map(deliveredLink), snapshots);
       const overwrite = await call(admin, 'POST', '/accounts/import-confirm', { content: line('short'), mode: 'overwrite', generate_share_links: true });
       assert.equal(overwrite.data.share_exports[0].path, short.path);
       const longest = await stock('long');

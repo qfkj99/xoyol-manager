@@ -48,6 +48,26 @@ export function publicAccount(account: Account): Account {
   return { ...withoutClaimHash(account), password: '', refresh_token: '', has_password: !!account.password, has_refresh_token: !!account.refresh_token };
 }
 
+function administratorShareAccess(user: AuthUser, accounts: Account[]): Map<number, Pick<Account, 'share_link_enabled' | 'share_link_last_accessed_at'>> {
+  const access = new Map<number, Pick<Account, 'share_link_enabled' | 'share_link_last_accessed_at'>>();
+  if (user.role !== 'admin' || !accounts.length) return access;
+  const rows = db.prepare(`SELECT l.account_id,l.last_accessed_at FROM account_share_links l
+    JOIN accounts a ON a.id=l.account_id AND a.owner_user_id=l.owner_user_id
+    JOIN users u ON u.id=l.owner_user_id
+    WHERE l.account_id IN (${accounts.map(() => '?').join(',')})
+      AND (l.expires_at IS NULL OR l.expires_at>?) AND u.status='active' AND u.must_change_password=0`)
+    .all(...accounts.map(account => account.id), Date.now()) as { account_id: number; last_accessed_at: number | null }[];
+  const links = new Map(rows.map(row => [row.account_id, row]));
+  for (const account of accounts) {
+    const link = links.get(account.id);
+    access.set(account.id, {
+      share_link_enabled: !!link,
+      share_link_last_accessed_at: link?.last_accessed_at == null ? null : new Date(link.last_accessed_at).toISOString(),
+    });
+  }
+  return access;
+}
+
 function accountInput(data: Partial<Account> & { email_password?: string }, creating = false): Partial<Account> {
   const result: Partial<Account> = {};
   const source = { ...data, ...(data.email_password !== undefined && data.password === undefined ? { password: data.email_password } : {}) };
@@ -215,12 +235,13 @@ export class AccountModel {
     const params: any[] = [...scope.params, ...(search ? Array(4).fill(`%${search}%`) : []), ...(claimStatus ? [claimStatus] : [])];
     const total = (db.prepare(`SELECT COUNT(*) AS c FROM accounts WHERE ${where}`).get(...params) as any).c;
     const rows = db.prepare(`SELECT * FROM accounts WHERE ${where} ORDER BY id DESC LIMIT ? OFFSET ?`).all(...params, pageSize, (page - 1) * pageSize) as Account[];
-    return { list: rows.map(account => ({ ...publicAccount(account), tags: tagModel.getTagsByAccountId(user, account.id) })), total, page, pageSize };
+    const shareAccess = administratorShareAccess(user, rows);
+    return { list: rows.map(account => ({ ...publicAccount(account), ...shareAccess.get(account.id), tags: tagModel.getTagsByAccountId(user, account.id) })), total, page, pageSize };
   }
 
   getById(user: AuthUser, id: number): Account {
     const account = requireResource<Account>('accounts', id, user);
-    return { ...withoutClaimHash(account), tags: tagModel.getTagsByAccountId(user, id) } as Account;
+    return { ...withoutClaimHash(account), ...administratorShareAccess(user, [account]).get(id), tags: tagModel.getTagsByAccountId(user, id) } as Account;
   }
 
   create(user: AuthUser, data: Partial<Account>): Account {

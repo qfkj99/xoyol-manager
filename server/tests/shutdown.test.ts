@@ -40,7 +40,7 @@ test('service stop drains requests, checkpoints SQLite, and preserves data acros
       const listen = app.listen.bind(app);
       app.listen = (...args) => {
         const server = listen(...args);
-        server.once('listening', () => process.send({ event: 'listening', port: server.address().port }));
+        server.once('listening', () => process.send({ event: 'listening', port: server.address().port, schemaVersion: require('./src/database/migrations.ts').SCHEMA_VERSION }));
         return server;
       };
       process.on('message', message => {
@@ -98,7 +98,7 @@ test('service stop drains requests, checkpoints SQLite, and preserves data acros
   }
 
   const first = start();
-  const { port } = await first.event('listening');
+  const { port, schemaVersion } = await first.event('listening');
   const config = await request(port, '/api/auth/config');
   assert.equal(config.status, 200);
   const active = request(port, '/__shutdown-test');
@@ -116,7 +116,7 @@ test('service stop drains requests, checkpoints SQLite, and preserves data acros
   try {
     assert.equal((db.prepare("SELECT value FROM settings WHERE key='shutdown_test'").get() as { value: string }).value, 'persisted');
     assert.equal(db.pragma('integrity_check', { simple: true }), 'ok');
-    assert.equal((db.prepare('SELECT MAX(version) AS version FROM schema_migrations').get() as { version: number }).version, 7);
+    assert.equal((db.prepare('SELECT MAX(version) AS version FROM schema_migrations').get() as { version: number }).version, schemaVersion);
   } finally { db.close(); }
 
   const second = start();

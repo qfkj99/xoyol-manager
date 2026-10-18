@@ -25,7 +25,7 @@ export default function Accounts() {
   const [params, setParams] = useSearchParams();
   const {
     accounts, loading, error, selectedIds, searchQuery, pagination,
-    fetchAccounts, createAccount, updateAccount, importAccounts,
+    fetchAccounts, refreshAccountsSilent, createAccount, updateAccount, importAccounts,
     exportAccounts, setSelectedIds, setSearchQuery, setPage, setPageSize, ownerUserId, setOwnerUserId, claimStatus, setClaimStatus,
   } = useAccountStore();
 
@@ -61,6 +61,12 @@ export default function Accounts() {
   };
 
   useEffect(() => { fetchAccounts().catch(e => toast.error(e.message)); fetchTags().catch(e => toast.error(e.message)); }, []);
+  useEffect(() => {
+    if (user?.role !== 'admin') return;
+    const refresh = () => { void refreshAccountsSilent(); };
+    window.addEventListener('focus', refresh);
+    return () => window.removeEventListener('focus', refresh);
+  }, [user?.role, refreshAccountsSilent]);
   useEffect(() => {
     if (params.get('action') === 'add') { if (user?.role === 'admin') { setEditAccount(null); setEditOpen(true); } else setImportOpen(true); setParams({}, { replace: true }); }
     if (params.get('action') === 'import') { setImportOpen(true); setParams({}, { replace: true }); }
@@ -345,7 +351,7 @@ export default function Accounts() {
       </Modal>}
       {publishOpen && <Modal title={claimCodes.length ? '保存一次性认领码' : '发布账号认领'} description={claimCodes.length ? '请复制保存后再关闭此窗口。' : `为选中的 ${selectedIds.length} 个账号生成一次性认领码。重新生成会立即使旧码失效。尚未认领的账号仍由管理员管理。`} onClose={() => { setPublishOpen(false); setClaimCodes([]); }} busy={publishBusy}>{claimCodes.length ? <><ClaimCodeList codes={claimCodes} /><button className="button-secondary mt-5 w-full" onClick={() => { setPublishOpen(false); setClaimCodes([]); }}>已保存，完成</button></> : <div className="space-y-5"><FormError message={publishError} /><button className="button-primary w-full" disabled={publishBusy} onClick={async () => { setPublishBusy(true); setPublishError(''); try { const data = await accountApi.publishClaims(selectedIds); setClaimCodes(data.claim_codes); await fetchAccounts(); } catch (err) { setPublishError(err instanceof Error ? err.message : '生成认领码失败'); } finally { setPublishBusy(false); } }}>{publishBusy ? '生成中…' : '生成一次性认领码'}</button><button className="button-secondary w-full" disabled={publishBusy} onClick={async () => { setPublishBusy(true); setPublishError(''); try { await accountApi.revokeClaims(selectedIds); setPublishOpen(false); await fetchAccounts(); toast.success('已撤销尚未使用的认领码'); } catch (err) { setPublishError(err instanceof Error ? err.message : '撤销失败'); } finally { setPublishBusy(false); } }}>撤销选中账号尚未使用的认领码</button><p className="text-xs leading-6 text-muted-foreground">撤销只取消待认领资格；已被用户认领的账号需要使用“移交账号”调整归属。</p></div>}</Modal>}
       {verificationAccount && <VerificationCodeDialog account={verificationAccount} onClose={() => setVerificationAccount(null)} onViewMail={mailbox => { handleViewMail(verificationAccount, mailbox); setVerificationAccount(null); }} />}
-      {shareAccount && <ShareLinkDialog key={shareAccount.id} account={shareAccount} onClose={() => setShareAccount(null)} />}
+      {shareAccount && <ShareLinkDialog key={shareAccount.id} account={shareAccount} onClose={() => { setShareAccount(null); if (user?.role === 'admin') void refreshAccountsSilent(); }} />}
       {mailViewAccount && (
         <MailViewerDialog
           open={mailViewOpen}

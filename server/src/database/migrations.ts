@@ -7,7 +7,7 @@ import { randomUUID } from 'crypto';
 import { validateDatabaseSchema } from './schema';
 export { validateDatabaseSchema } from './schema';
 
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 9;
 
 /** A consistent SQLite snapshot precedes an atomic, versioned upgrade. */
 export async function runMigrations(db: Database = defaultDb, dbPath = config.dbPath) {
@@ -209,6 +209,29 @@ export async function runMigrations(db: Database = defaultDb, dbPath = config.db
           if (!updated.changes) db.prepare('INSERT INTO sqlite_sequence(name,seq) VALUES(?,?)').run('account_share_links', sequence.seq);
         }
         db.prepare('INSERT INTO schema_migrations (version) VALUES (7)').run();
+      }
+      if (currentVersion < 8) {
+        db.exec('ALTER TABLE account_share_links ADD COLUMN last_accessed_at INTEGER');
+        db.prepare('INSERT INTO schema_migrations (version) VALUES (8)').run();
+      }
+      if (currentVersion < 9) {
+        db.exec(`
+          CREATE TABLE IF NOT EXISTS api_keys (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            key_hash TEXT NOT NULL UNIQUE,
+            prefix TEXT NOT NULL,
+            created_by INTEGER NOT NULL,
+            scopes TEXT NOT NULL,
+            expires_at INTEGER,
+            revoked_at INTEGER,
+            last_used_at INTEGER,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE CASCADE
+          );
+          CREATE INDEX IF NOT EXISTS idx_api_keys_creator ON api_keys(created_by);
+        `);
+        db.prepare('INSERT INTO schema_migrations (version) VALUES (9)').run();
       }
       if ((db.pragma('foreign_key_check') as unknown[]).length) throw new Error('数据库外键校验失败，升级已回滚');
       validateDatabaseSchema(db);

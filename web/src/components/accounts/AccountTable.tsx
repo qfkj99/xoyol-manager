@@ -103,6 +103,25 @@ function CredentialCell({ account, field }: { account: Account; field: 'password
   return <td className="px-3 py-3"><div className="flex items-center gap-2"><span className="max-w-40 truncate font-mono text-xs" title={value ?? undefined}>{value === null ? (account[field === 'password' ? 'has_password' : 'has_refresh_token'] ? '••••••••' : '—') : value || '—'}</span><button className="min-h-11 px-1 text-xs text-primary hover:underline" onClick={() => value === null ? void reveal() : setValue(null)} disabled={busy}>{value === null ? '显示' : '隐藏'}</button><button className="min-h-11 px-1 text-xs text-muted-foreground hover:underline" onClick={() => void reveal(true)} disabled={busy}>复制</button></div></td>;
 }
 
+function shortLinkAccessLabel(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
+function ShortLinkAccess({ account }: { account: Account }) {
+  if (!account.share_link_enabled) {
+    return <span className="inline-flex whitespace-nowrap rounded-full bg-secondary px-2 py-1 text-xs text-muted-foreground">无有效短链</span>;
+  }
+
+  if (!account.share_link_last_accessed_at) {
+    return <span className="inline-flex whitespace-nowrap rounded-full bg-amber-100 px-2 py-1 text-xs text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">未访问</span>;
+  }
+
+  const dateTime = account.share_link_last_accessed_at;
+  const label = shortLinkAccessLabel(dateTime);
+  return <div className="space-y-1"><span className="inline-flex whitespace-nowrap rounded-full bg-green-100 px-2 py-1 text-xs text-green-700 dark:bg-green-900/30 dark:text-green-400">已访问</span><time dateTime={dateTime} className="block text-xs text-muted-foreground md:whitespace-nowrap" title={`最后访问：${label}`}>最后访问：{label}</time></div>;
+}
+
 async function copyCredential(account: Account, field: 'password' | 'refresh_token') {
   try { const detail = await accountApi.credentials(account.id); await navigator.clipboard.writeText(detail[field]); toast.success('已复制'); }
   catch (error) { toast.error(error instanceof Error ? error.message : '复制失败'); }
@@ -214,7 +233,7 @@ export default function AccountTable({ accounts, selectedIds, onSelectIds, onEdi
 
   return (
     <div>
-      <div className="divide-y divide-border md:hidden">{sortedAccounts.map(account => <article key={account.id} className="space-y-4 p-4"><div className="flex items-center gap-3"><input type="checkbox" aria-label={`选择 ${account.game_account || account.email}`} className="h-5 w-5 accent-green-700" checked={selectedIds.includes(account.id)} onChange={() => toggleOne(account.id)} /><h3 className="min-w-0 flex-1 break-all font-semibold">{account.game_account || '待补充游戏账号'}</h3>{showOwner && <span className="rounded-full bg-secondary px-2 py-1 text-xs text-muted-foreground">{account.claim_status === 'available' ? '待认领' : '已归属'}</span>}</div><dl className="grid grid-cols-[96px_1fr] gap-x-3 gap-y-2 text-sm">{([['game_account', '游戏账号'], ['game_password', '游戏密码'], ['real_name', 'name / 姓名'], ['id_last_six', '身份证后六位'], ['email', '绑定微软邮箱']] as const).map(([field, label]) => <div className="contents" key={field}><dt className="text-muted-foreground">{label}</dt><dd className="min-w-0 break-all font-mono">{account[field] || '—'}</dd></div>)}</dl>{showOwner && <p className="text-xs text-muted-foreground">归属：{account.owner_username || `用户 #${account.owner_user_id}`}</p>}<div className="flex flex-wrap gap-2"><button className="button-primary !text-xs" onClick={() => onVerificationCode(account)}><KeyRound size={15} />获取验证码</button><button className="button-secondary !text-xs" onClick={() => { navigator.clipboard.writeText([account.game_account, account.game_password, account.real_name, account.id_last_six, account.email].join('----')).then(() => toast.success('游戏登录信息已复制')).catch(() => toast.error('复制失败')); }}><Copy size={15} />复制信息</button><button className="button-secondary !text-xs" onClick={() => onShareLink(account)}><Link2 size={15} aria-hidden="true" />短链</button><button className="button-secondary !text-xs" onClick={() => onEdit(account)}>编辑</button><button className="button-secondary !text-xs text-red-600" onClick={() => onDelete(account.id)}>删除</button></div></article>)}</div>
+      <div className="divide-y divide-border md:hidden">{sortedAccounts.map(account => <article key={account.id} className="space-y-4 p-4"><div className="flex items-center gap-3"><input type="checkbox" aria-label={`选择 ${account.game_account || account.email}`} className="h-5 w-5 accent-green-700" checked={selectedIds.includes(account.id)} onChange={() => toggleOne(account.id)} /><h3 className="min-w-0 flex-1 break-all font-semibold">{account.game_account || '待补充游戏账号'}</h3>{showOwner && <span className="rounded-full bg-secondary px-2 py-1 text-xs text-muted-foreground">{account.claim_status === 'available' ? '待认领' : '已归属'}</span>}</div><dl className="grid grid-cols-[96px_1fr] gap-x-3 gap-y-2 text-sm">{([['game_account', '游戏账号'], ['game_password', '游戏密码'], ['real_name', 'name / 姓名'], ['id_last_six', '身份证后六位'], ['email', '绑定微软邮箱']] as const).map(([field, label]) => <div className="contents" key={field}><dt className="text-muted-foreground">{label}</dt><dd className="min-w-0 break-all font-mono">{account[field] || '—'}</dd></div>)}{showOwner && <div className="contents"><dt className="text-muted-foreground">短链访问</dt><dd><ShortLinkAccess account={account} /></dd></div>}</dl>{showOwner && <p className="text-xs text-muted-foreground">归属：{account.owner_username || `用户 #${account.owner_user_id}`}</p>}<div className="flex flex-wrap gap-2"><button className="button-primary !text-xs" onClick={() => onVerificationCode(account)}><KeyRound size={15} />获取验证码</button><button className="button-secondary !text-xs" onClick={() => { navigator.clipboard.writeText([account.game_account, account.game_password, account.real_name, account.id_last_six, account.email].join('----')).then(() => toast.success('游戏登录信息已复制')).catch(() => toast.error('复制失败')); }}><Copy size={15} />复制信息</button><button className="button-secondary !text-xs" onClick={() => onShareLink(account)}><Link2 size={15} aria-hidden="true" />短链</button><button className="button-secondary !text-xs" onClick={() => onEdit(account)}>编辑</button><button className="button-secondary !text-xs text-red-600" onClick={() => onDelete(account.id)}>删除</button></div></article>)}</div>
       <div className="hidden overflow-x-auto md:block"><table className="w-full text-sm">
         <thead>
           <tr className="border-b border-zinc-200 dark:border-zinc-700">
@@ -224,13 +243,14 @@ export default function AccountTable({ accounts, selectedIds, onSelectIds, onEdi
             {isVisible('index') && (
               <th className="w-12 text-center py-3 px-3 font-medium text-zinc-500 dark:text-zinc-400">#</th>
             )}
-            {isVisible('game_account') && <SortHeader label="游戏账号" sortKey="game_account" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />}
+            {isVisible('game_account') && <SortHeader label="游戏账号" sortKey="game_account" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} className="min-w-40 whitespace-nowrap" />}
             {isVisible('game_password') && <th className="min-w-32 px-3 py-3 text-left font-medium text-muted-foreground">游戏密码</th>}
-            {isVisible('real_name') && <th className="min-w-24 px-3 py-3 text-left font-medium text-muted-foreground">name / 姓名</th>}
+            {isVisible('real_name') && <th className="min-w-28 whitespace-nowrap px-3 py-3 text-left font-medium text-muted-foreground">name / 姓名</th>}
             {isVisible('id_last_six') && <th className="min-w-28 px-3 py-3 text-left font-medium text-muted-foreground">身份证后六位</th>}
             {isVisible('email') && (
-              <SortHeader label="绑定微软邮箱" sortKey="email" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
+              <SortHeader label="绑定微软邮箱" sortKey="email" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} className="min-w-56 whitespace-nowrap" />
             )}
+            {showOwner && <th className="min-w-44 px-3 py-3 text-left font-medium text-muted-foreground">短链访问</th>}
             {isVisible('password') && (
               <th className="min-w-[160px] text-left py-3 px-3 font-medium text-zinc-500 dark:text-zinc-400">邮箱密码</th>
             )}
@@ -283,6 +303,7 @@ export default function AccountTable({ accounts, selectedIds, onSelectIds, onEdi
                   </div>
                 </CopyCell>
               )}
+              {showOwner && <td className="px-3 py-3 align-middle"><ShortLinkAccess account={account} /></td>}
               {isVisible('password') && (
                 <CredentialCell key={`password-${account.updated_at}-${account.owner_user_id}`} account={account} field="password" />
               )}
@@ -325,8 +346,8 @@ export default function AccountTable({ accounts, selectedIds, onSelectIds, onEdi
               {isVisible('actions') && (
                 <td className="py-3 px-3">
                   <div className="flex items-center justify-end gap-1">
-                    <button className="button-primary !min-h-10 !px-3 !text-xs" onClick={() => onVerificationCode(account)}><KeyRound size={15} />验证码</button>
-                    <button className="button-secondary !px-3 !text-xs" onClick={() => onShareLink(account)}><Link2 size={15} aria-hidden="true" />短链</button>
+                    <button className="button-primary shrink-0 whitespace-nowrap !min-h-10 !px-3 !text-xs" onClick={() => onVerificationCode(account)}><KeyRound size={15} />验证码</button>
+                    <button className="button-secondary shrink-0 whitespace-nowrap !px-3 !text-xs" onClick={() => onShareLink(account)}><Link2 size={15} aria-hidden="true" />短链</button>
                     <button className="min-h-10 min-w-10 rounded-lg p-2 text-muted-foreground hover:bg-secondary" title="复制游戏账号、游戏密码、name、身份证后六位和邮箱" onClick={() => { navigator.clipboard.writeText([account.game_account, account.game_password, account.real_name, account.id_last_six, account.email].join('----')).then(() => toast.success('游戏登录信息已复制')).catch(() => toast.error('复制失败')); }}><Copy size={16} /></button>
                     <button onClick={() => onEdit(account)} title="编辑" className="p-1.5 rounded-lg text-zinc-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>

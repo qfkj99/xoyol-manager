@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 import { settingsApi } from '../lib/api';
 import { useAuthStore } from '../stores/auth';
 import type { AuditLog } from '../types';
 import { FormError, Pagination } from '../components/auth/FormControls';
 import BackupRestore from '../components/accounts/BackupRestore';
+import ApiKeySettings from '../components/settings/ApiKeySettings';
 
 const actionLabels: Record<string, string> = {
   'auth.login': '登录', 'auth.logout': '退出登录', 'auth.register': '注册', 'auth.password': '修改密码',
@@ -23,13 +25,22 @@ const actionLabels: Record<string, string> = {
   'tag.create': '创建标签', 'tag.update': '更新标签', 'tag.delete': '删除标签',
   'mail.fetch': '获取邮件', 'mail.fetch-new': '获取最新邮件', 'mail.clear': '清空邮件', 'mail.verification-code': '获取邮箱验证码',
   'backup.reauthenticate': '备份操作密码验证', 'backup.download': '数据库备份', 'backup.restore': '数据库恢复',
+  'api-key.create': '生成 API 密钥', 'api-key.revoke': '撤销 API 密钥',
+  'external.account.list': 'API 查询账号列表', 'external.account.credentials': 'API 查看账号凭据',
+  'external.account.import': 'API 导入账号并生成短链', 'external.account.share-read': 'API 查看短链',
+  'external.account.share-create': 'API 生成或重置短链', 'external.account.share-revoke': 'API 关闭短链',
+  'external.mail.verification-code': 'API 获取邮箱验证码',
 };
-const targetLabels: Record<string, string> = { user: '用户', account: '游戏账号', proxy: '代理', tag: '标签', system: '系统', settings: '设置' };
+const targetLabels: Record<string, string> = { user: '用户', account: '游戏账号', proxy: '代理', tag: '标签', system: '系统', settings: '设置', 'api-key': 'API 密钥' };
 function validateShortLinkLength(value: string) {
   const length = Number(value);
   return value.trim() && Number.isInteger(length) && length >= 8 && length <= 64 ? '' : '请输入 8–64 之间的整数。';
 }
 export default function Settings() {
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (hash === '#api-key-heading') document.getElementById('api-key-heading')?.scrollIntoView({ block: 'start' });
+  }, [hash]);
   const [enabled, setEnabled] = useState(false);
   const [original, setOriginal] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -97,7 +108,7 @@ export default function Settings() {
   };
   const shortLinkValidationError = shortLinkTouched ? validateShortLinkLength(shortLinkLength) : '';
   const shortLinkError = shortLinkValidationError || shortLinkSaveError;
-  return <div className="space-y-6"><div><h1 className="text-2xl font-semibold">系统设置</h1><p className="mt-2 text-sm text-muted-foreground">管理注册入口、短链长度、数据库备份与操作记录。</p></div>
+  return <div className="space-y-6"><div><h1 className="text-2xl font-semibold">系统设置</h1><p className="mt-2 text-sm text-muted-foreground">管理注册入口、短链长度、外部 API 密钥、数据库备份与操作记录。</p></div>
     {loadError && <div className="space-y-3"><FormError message={loadError} /><button className="button-secondary" onClick={() => setLoadAttempt(attempt => attempt + 1)}>重新加载设置</button></div>}
     <div className="grid items-start gap-6 lg:grid-cols-2">
       <section className="space-y-5 rounded-lg border border-border bg-card p-6">
@@ -120,6 +131,7 @@ export default function Settings() {
           <button className="button-primary" disabled={loading || !!loadError || shortLinkBusy || Number(shortLinkLength) === originalShortLinkLength}>{loading ? '加载中…' : shortLinkBusy ? '保存中…' : '保存短链设置'}</button>
         </form>
       </section>
+      <div className="min-w-0 lg:col-span-2"><ApiKeySettings onChange={loadAudit} /></div>
       <section className="rounded-lg border border-border bg-card p-6 lg:col-span-2"><h2 className="text-lg font-semibold">数据库备份与恢复</h2><p className="mb-6 mt-2 text-sm leading-7 text-muted-foreground">备份包含全部用户及业务数据。恢复后所有用户需要重新登录。</p><BackupRestore /></section>
     </div>
     <section className="space-y-4"><div className="flex items-center justify-between gap-3"><h2 className="text-lg font-semibold">操作审计</h2><button className="button-secondary" disabled={auditLoading} onClick={() => void loadAudit()}>刷新记录</button></div><FormError message={auditError} /><div className="overflow-x-auto rounded-lg border border-border bg-card"><table className="w-full min-w-[750px] text-left text-sm"><thead className="border-b border-border bg-secondary text-muted-foreground"><tr>{['时间', '操作者', '操作', '对象', '结果', '来源 IP'].map(label => <th className="px-4 py-4 font-medium" key={label}>{label}</th>)}</tr></thead><tbody className="divide-y divide-border">{auditLoading ? <tr><td colSpan={6} className="p-10 text-center text-muted-foreground" role="status">正在加载记录…</td></tr> : logs.length === 0 ? <tr><td colSpan={6} className="p-10 text-center text-muted-foreground">暂无操作记录</td></tr> : logs.map(log => <tr key={log.id}><td className="px-4 py-4 text-xs">{new Date(log.created_at).toLocaleString()}</td><td className="px-4 py-4">{log.actor_username || (log.actor_id ? `用户 #${log.actor_id}` : '访客 / 系统')}</td><td className="px-4 py-4">{actionLabels[log.action] || log.action}</td><td className="px-4 py-4 text-muted-foreground">{[log.target_type ? targetLabels[log.target_type] || log.target_type : '', log.target_id].filter(v => v != null && v !== '').join(' #') || '—'}</td><td className="px-4 py-4">{['success', 'ok', 'active'].includes(log.result) ? '成功' : ['failure', 'failed', 'error'].includes(log.result) ? '失败' : log.result}</td><td className="px-4 py-4 text-xs text-muted-foreground">{log.ip === 'local-cli' ? '本机管理工具' : log.ip || '—'}</td></tr>)}</tbody></table></div><Pagination page={page} pageSize={20} total={total} onPage={setPage} disabled={auditLoading} /></section>

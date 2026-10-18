@@ -138,6 +138,98 @@ test('account short links expose only the selected account and remain revocable'
       assert.match(page.headers.get('x-robots-tag') || '', /noindex/i);
     });
 
+    await t.test('only administrators see persisted access state and successful page reads record visits', async () => {
+      const account = await create(alice, 'access_state');
+      const storedAccess = () => (db.prepare('SELECT last_accessed_at FROM account_share_links WHERE account_id=?').get(account.id) as any)?.last_accessed_at;
+      const listed = async (b: Browser) => (await call(b, 'GET', '/accounts?search=share_game_access_state')).data.list[0];
+      const noAccessFields = (value: object) => {
+        for (const key of ['share_link_enabled', 'share_link_last_accessed_at', 'last_accessed_at']) assert.equal(key in value, false, key);
+      };
+      let visible = await listed(admin);
+      assert.equal(visible.share_link_enabled, false);
+      assert.equal(visible.share_link_last_accessed_at, null);
+      noAccessFields(await listed(alice));
+      const link = await publish(alice, account.id);
+      visible = (await call(admin, 'GET', `/accounts/${account.id}/credentials`)).data;
+      assert.equal(visible.share_link_enabled, true);
+      assert.equal(visible.share_link_last_accessed_at, null);
+      noAccessFields((await call(alice, 'GET', `/accounts/${account.id}/credentials`)).data);
+      noAccessFields((await call(alice, 'GET', `/accounts/${account.id}/share-link`)).data);
+      await call(admin, 'GET', `/accounts/${account.id}/share-link`);
+      assert.equal((await raw(alice, 'HEAD', shared(link.token))).status, 200);
+      await fetch(origin + link.path);
+      assert.equal(storedAccess(), null, 'management reads, HEAD, and the SPA document are not a successful account read');
+      const mailMock = t.mock.method(MailService.prototype, 'fetchVerificationMails', async () => ({ mails: [], total: 0, cached: false, protocol: 'graph' }));
+      try {
+        const code = await call(browser(), 'POST', `${shared(link.token)}/verification-code`, {}, false);
+        assert.equal(code.status, 200, code.message);
+        noAccessFields(code.data);
+        assert.equal(storedAccess(), null, 'verification requests alone do not mark a page visit');
+      } finally { mailMock.mock.restore(); }
+
+      const before = Date.now();
+      const response = await call(browser(), 'GET', shared(link.token));
+      assert.equal(response.status, 200, response.message);
+      noAccessFields(response.data);
+      const accessedAt = storedAccess();
+      assert.ok(accessedAt >= before && accessedAt <= Date.now());
+      visible = await listed(admin);
+      assert.equal(visible.share_link_enabled, true);
+      assert.equal(visible.share_link_last_accessed_at, new Date(accessedAt).toISOString());
+      assert.equal((await call(admin, 'GET', `/accounts/${account.id}/credentials`)).data.share_link_last_accessed_at, visible.share_link_last_accessed_at);
+      noAccessFields(await listed(alice));
+
+      db.prepare('UPDATE account_share_links SET last_accessed_at=? WHERE account_id=?').run(accessedAt - 60_000, account.id);
+      assert.equal((await call(browser(), 'GET', shared(link.token))).status, 200);
+      assert.ok(storedAccess() >= accessedAt, 'a later successful visit advances the latest visit');
+      const saved = storedAccess();
+      closeDatabase();
+      const { reopenDatabase } = await import('../src/database');
+      reopenDatabase();
+      assert.equal((await listed(admin)).share_link_last_accessed_at, new Date(saved).toISOString());
+
+      const reset = await publish(alice, account.id);
+      assert.equal(storedAccess(), null, 'a replacement URL starts unvisited');
+      await unavailable(link.token);
+      assert.equal(storedAccess(), null, 'a rejected old URL cannot mark the replacement as visited');
+      db.prepare('UPDATE account_share_links SET expires_at=? WHERE account_id=?').run(Date.now() - 1, account.id);
+      await unavailable(reset.token);
+      assert.equal(storedAccess(), null);
+      visible = await listed(admin);
+      assert.equal(visible.share_link_enabled, false);
+      assert.equal(visible.share_link_last_accessed_at, null);
+
+      const disabled = await publish(alice, account.id);
+      db.prepare("UPDATE users SET status='disabled' WHERE id=?").run(aliceRecord.id);
+      try {
+        await unavailable(disabled.token);
+        assert.equal(storedAccess(), null);
+        assert.equal((await listed(admin)).share_link_enabled, false);
+      } finally { db.prepare("UPDATE users SET status='active' WHERE id=?").run(aliceRecord.id); }
+      await call(alice, 'DELETE', `/accounts/${account.id}/share-link`);
+      assert.equal((await listed(admin)).share_link_enabled, false);
+    });
+
+    await t.test('claiming and returning delivered accounts preserve visits to their existing URL', async () => {
+      const data = accountData('visited_delivery');
+      const imported = await call(admin, 'POST', '/accounts/import-confirm', {
+        content: [data.game_account, data.game_password, data.real_name, data.id_last_six, data.email, data.password, data.client_id, data.refresh_token].join('----'),
+        mode: 'skip', generate_share_links: true,
+      });
+      assert.equal(imported.status, 200, imported.message);
+      const deliveredPath = imported.data.share_exports[0].path;
+      const token = deliveredPath.slice(3);
+      tokens.push(token);
+      assert.equal((await call(browser(), 'GET', shared(token))).status, 200);
+      const before = db.prepare('SELECT * FROM account_share_links WHERE token=?').get(token) as any;
+      const delivery = [data.game_account, data.game_password, data.real_name, data.id_last_six, origin + deliveredPath].join('----');
+      assert.equal((await call(alice, 'POST', '/accounts/import', { content: delivery })).data.imported, 1);
+      assert.deepEqual(db.prepare('SELECT * FROM account_share_links WHERE token=?').get(token), { ...before, owner_user_id: aliceRecord.id });
+      assert.equal((await call(admin, 'GET', `/accounts/${before.account_id}/credentials`)).data.share_link_last_accessed_at, new Date(before.last_accessed_at).toISOString());
+      assert.equal((await call(alice, 'DELETE', `/accounts/${before.account_id}`)).status, 200);
+      assert.deepEqual(db.prepare('SELECT * FROM account_share_links WHERE token=?').get(token), before);
+    });
+
     await t.test('public verification works without session or CSRF and cannot select another account or proxy', async () => {
       const account = await create(alice, 'verification');
       const other = await create(bob, 'verification_other');

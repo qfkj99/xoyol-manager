@@ -25,6 +25,7 @@ test('version seven supports configurable token lengths without changing deliver
   try {
     await runMigrations(database, ':memory:');
     database.exec(`DELETE FROM schema_migrations WHERE version>=7;
+      DROP TABLE api_keys;
       DELETE FROM settings WHERE key='short_link_length';
       DROP TABLE account_share_links;
       ${versionSixShareTable};
@@ -41,14 +42,14 @@ test('version seven supports configurable token lengths without changing deliver
     insert.run(12, 3, 'C'.repeat(22), 1, '2026-03-03 03:04:05', null);
     insert.run(31, 4, 'D'.repeat(22), 1, '2026-04-04 04:05:06', null);
     database.prepare('DELETE FROM account_share_links WHERE id=31').run();
-    const originalLinks = database.prepare('SELECT * FROM account_share_links ORDER BY id').all();
+    const originalLinks = database.prepare('SELECT * FROM account_share_links ORDER BY id').all() as Record<string, unknown>[];
     const originalAccounts = database.prepare('SELECT * FROM accounts ORDER BY id').all();
     const originalMail = database.prepare('SELECT * FROM mail_cache ORDER BY id').all();
     assert.throws(() => database.prepare('INSERT INTO account_share_links(account_id,token,owner_user_id) VALUES(4,?,1)').run('E'.repeat(8)), /CHECK/);
 
     await t.test('v6 migration retains valid, expired, and permanent links and all related data', async () => {
       await runMigrations(database, ':memory:');
-      assert.deepEqual(database.prepare('SELECT * FROM account_share_links ORDER BY id').all(), originalLinks);
+      assert.deepEqual(database.prepare('SELECT * FROM account_share_links ORDER BY id').all(), originalLinks.map(row => ({ ...row, last_accessed_at: null })));
       assert.deepEqual(database.prepare('SELECT * FROM accounts ORDER BY id').all(), originalAccounts);
       assert.deepEqual(database.prepare('SELECT * FROM mail_cache ORDER BY id').all(), originalMail);
       assert.equal((database.prepare("SELECT value FROM settings WHERE key='short_link_length'").get() as any).value, '22');
@@ -118,6 +119,7 @@ test('v7 initialization preserves preexisting configured lengths and can rebuild
   try {
     await runMigrations(database, ':memory:');
     database.exec(`DELETE FROM schema_migrations WHERE version>=7;
+      DROP TABLE api_keys;
       UPDATE settings SET value='64' WHERE key='short_link_length';
       DROP TABLE account_share_links;
       ${versionSixShareTable};
@@ -140,7 +142,8 @@ test('a claimed v7 schema with the old 22 character constraint is rejected', asy
   const database = new Database(':memory:');
   try {
     await runMigrations(database, ':memory:');
-    database.exec(`DROP TABLE account_share_links; ${versionSixShareTable}`);
+    database.exec(`DROP TABLE account_share_links; ${versionSixShareTable};
+      ALTER TABLE account_share_links ADD COLUMN last_accessed_at INTEGER`);
     assert.throws(() => validateDatabaseSchema(database), /account_share_links.token.*长度约束/);
     await assert.rejects(runMigrations(database, ':memory:'), /account_share_links.token.*长度约束/);
   } finally { database.close(); }

@@ -5,6 +5,8 @@ export interface Account {
   inventory_admin_id: number | null;
   has_password?: boolean;
   has_refresh_token?: boolean;
+  share_link_enabled?: boolean;
+  share_link_last_accessed_at?: string | null;
   game_account: string;
   game_password: string;
   real_name: string;

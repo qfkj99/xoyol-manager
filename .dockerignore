@@ -20,5 +20,6 @@
 **/*.key
 **/*.crt
 server/tests
-docs
+docs/*
+!docs/external-api.md
 .DS_Store

@@ -45,7 +45,9 @@ export class ShareLinkController {
 
   async details(ctx: Context) {
     rateLimit(ctx, `share-read:${ctx.ip}`, 120, 60_000);
-    const { account, link } = model.resolve(ctx.params.token);
+    const { account, link } = ctx.method === 'GET'
+      ? model.resolveAndRecordAccess(ctx.params.token)
+      : model.resolve(ctx.params.token);
     // Explicitly enumerate fields: owner IDs, claim codes and unrelated data
     // must never become visible when the account model gains new fields.
     success(ctx, {

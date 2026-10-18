@@ -16,6 +16,7 @@ WORKDIR /app/web
 COPY web/package*.json ./
 RUN npm install --include=dev --no-audit --no-fund
 COPY web/ ./
+COPY docs/external-api.md /app/docs/external-api.md
 RUN npm run build
 
 FROM node:22-bookworm-slim AS runtime

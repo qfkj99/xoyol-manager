@@ -5,9 +5,10 @@ import { authApi } from '../lib/api';
 import { useAuthStore } from '../stores/auth';
 import { useThemeStore } from '../stores/theme';
 import { FormError, PasswordField } from '../components/auth/FormControls';
+import { BrandLogo } from '../components/BrandLogo';
 
 export function safeReturnTo(value: string | null): string {
-  if (!value || !/^\/(dashboard|accounts|proxy|profile|users|settings)(\?|$)/.test(value) || value.includes('\\')) return '/dashboard';
+  if (!value || !/^\/(dashboard|accounts|proxy|profile|users|settings|docs\/api)([?#]|$)/.test(value) || value.includes('\\')) return '/dashboard';
   return value;
 }
 
@@ -30,7 +31,7 @@ export default function AuthPage({ register = false }: { register?: boolean }) {
 
   useEffect(() => { setPassword(''); setConfirmPassword(''); setError(''); }, [register]);
   useEffect(() => { void refreshConfig().catch(() => setError('无法读取登录设置，请刷新页面重试。')); }, [refreshConfig]);
-  if (user) return <Navigate to={user.must_change_password ? '/profile' : (user.role !== 'admin' && /^\/(proxy|users|settings)/.test(returnTo) ? '/dashboard' : returnTo)} replace />;
+  if (user) return <Navigate to={user.must_change_password ? '/profile' : (user.role !== 'admin' && /^\/(proxy|users|settings|docs\/api)/.test(returnTo) ? '/dashboard' : returnTo)} replace />;
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -52,7 +53,7 @@ export default function AuthPage({ register = false }: { register?: boolean }) {
 
   return <div className="auth-page min-h-dvh bg-background">
     <header className="mx-auto flex max-w-7xl items-center justify-between px-5 py-5 sm:px-8 lg:px-12">
-      <Link to="/" className="flex items-center gap-3 font-semibold"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground"><Mail size={21} aria-hidden="true" /></span><span>小师妹账号管理平台</span></Link>
+      <Link to="/" className="flex items-center gap-3 font-semibold"><BrandLogo alt="" /><span>小师妹账号管理平台</span></Link>
       <button className="button-secondary h-11 w-11 !p-0" aria-label="切换明暗主题" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>{theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}</button>
     </header>
     <main className="mx-auto grid max-w-7xl items-center gap-12 px-5 pb-10 pt-5 sm:px-8 lg:min-h-[calc(100dvh-112px)] lg:grid-cols-[1.1fr_1fr] lg:gap-20 lg:px-12 lg:py-10">

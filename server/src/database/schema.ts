@@ -11,9 +11,10 @@ const requiredColumns: Record<string, string[]> = {
   mail_cache: ['id', 'account_id', 'mailbox', 'mail_id', 'sender', 'sender_name', 'subject', 'text_content', 'html_content', 'mail_date', 'is_read', 'cached_at'],
   tags: ['id', 'name', 'color', 'created_at', 'owner_user_id'],
   account_tags: ['account_id', 'tag_id'],
-  account_share_links: ['id', 'account_id', 'token', 'owner_user_id', 'created_at', 'expires_at'],
+  account_share_links: ['id', 'account_id', 'token', 'owner_user_id', 'created_at', 'expires_at', 'last_accessed_at'],
   users: ['id', 'username', 'display_name', 'password_hash', 'role', 'status', 'must_change_password', 'source', 'last_login_at', 'created_at', 'updated_at'],
   sessions: ['id', 'user_id', 'token_hash', 'csrf_token', 'expires_at', 'created_at'],
+  api_keys: ['id', 'name', 'key_hash', 'prefix', 'created_by', 'scopes', 'expires_at', 'revoked_at', 'last_used_at', 'created_at'],
   settings: ['key', 'value'],
   audit_logs: ['id', 'actor_id', 'action', 'target_type', 'target_id', 'result', 'ip', 'created_at'],
   schema_migrations: ['version', 'applied_at'],
@@ -60,6 +61,7 @@ export function validateDatabaseSchema(db: Database): void {
   }
   requireUnique('users', ['username'], ['NOCASE']);
   requireUnique('sessions', ['token_hash']);
+  requireUnique('api_keys', ['key_hash']);
   requireUnique('tags', ['owner_user_id', 'name']);
   requireUnique('account_tags', ['account_id', 'tag_id']);
   requireUnique('account_share_links', ['account_id']);
@@ -105,6 +107,7 @@ export function validateDatabaseSchema(db: Database): void {
     ['account_share_links', 'account_id', 'accounts', 'CASCADE'],
     ['account_share_links', 'owner_user_id', 'users', 'CASCADE'],
     ['sessions', 'user_id', 'users', 'CASCADE'],
+    ['api_keys', 'created_by', 'users', 'CASCADE'],
     ['audit_logs', 'actor_id', 'users', 'NO ACTION'],
   ];
   for (const [table, from, referencedTable, onDelete] of requiredReferences) {

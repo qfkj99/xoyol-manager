@@ -148,6 +148,7 @@ test('email migration rejects canonical collisions atomically and enforces globa
   try {
     await runMigrations(versionOne, ':memory:');
     versionOne.exec(`DELETE FROM schema_migrations WHERE version>=2;
+      DROP TABLE api_keys;
       DELETE FROM settings WHERE key='short_link_length';
       DROP TABLE account_share_links;
       DROP INDEX idx_accounts_game_normalized;
@@ -187,12 +188,12 @@ test('claimed latest migration versions still require real schema and constraint
         csrf_token TEXT NOT NULL,expires_at INTEGER NOT NULL,created_at DATETIME);`, expected: /sessions.user_id.*外键/ },
     { name: 'short-link token without uniqueness', mutation: `DROP TABLE account_share_links;
       CREATE TABLE account_share_links(id INTEGER PRIMARY KEY,account_id INTEGER NOT NULL UNIQUE,
-        token TEXT NOT NULL CHECK(length(token) BETWEEN 8 AND 64),owner_user_id INTEGER NOT NULL,created_at DATETIME,expires_at INTEGER,
+        token TEXT NOT NULL CHECK(length(token) BETWEEN 8 AND 64),owner_user_id INTEGER NOT NULL,created_at DATETIME,expires_at INTEGER,last_accessed_at INTEGER,
         FOREIGN KEY(account_id) REFERENCES accounts(id) ON DELETE CASCADE,
         FOREIGN KEY(owner_user_id) REFERENCES users(id) ON DELETE CASCADE);`, expected: /account_share_links.*唯一约束.*token/ },
     { name: 'short-link account relationship without cascading deletion', mutation: `DROP TABLE account_share_links;
       CREATE TABLE account_share_links(id INTEGER PRIMARY KEY,account_id INTEGER NOT NULL UNIQUE,
-        token TEXT NOT NULL UNIQUE CHECK(length(token) BETWEEN 8 AND 64),owner_user_id INTEGER NOT NULL,created_at DATETIME,expires_at INTEGER,
+        token TEXT NOT NULL UNIQUE CHECK(length(token) BETWEEN 8 AND 64),owner_user_id INTEGER NOT NULL,created_at DATETIME,expires_at INTEGER,last_accessed_at INTEGER,
         FOREIGN KEY(account_id) REFERENCES accounts(id),
         FOREIGN KEY(owner_user_id) REFERENCES users(id) ON DELETE CASCADE);`, expected: /account_share_links.account_id.*外键/ },
   ];

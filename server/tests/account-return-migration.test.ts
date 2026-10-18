@@ -12,6 +12,7 @@ test('version six records historical administrator ownership without guessing us
     database.pragma('foreign_keys = ON');
     await runMigrations(database, ':memory:');
     database.exec(`DELETE FROM schema_migrations WHERE version>=6;
+      DROP TABLE api_keys;
       DELETE FROM settings WHERE key='short_link_length';
       DROP TABLE account_share_links;
       CREATE TABLE account_share_links (

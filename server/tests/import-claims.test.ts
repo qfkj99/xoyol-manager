@@ -165,6 +165,7 @@ test('administrator deliveries and user imports claim existing inventory', async
       assert.equal(shared.status, 200);
       assert.equal(shared.data.game_account, data('delivery').game_account);
       assert.equal(shared.data.password, data('delivery').password);
+      inherited.last_accessed_at = (db.prepare('SELECT last_accessed_at FROM account_share_links WHERE account_id=?').get(account.id) as any).last_accessed_at;
       const repeated = await call(alice, 'POST', '/accounts/import', { content: original });
       assert.equal(repeated.data.imported, 0);
       assert.equal(repeated.data.skipped, 1);
@@ -199,6 +200,7 @@ test('administrator deliveries and user imports claim existing inventory', async
       assert.equal(managed.status, 200);
       assert.deepEqual(managed.data, { enabled: true, path: deliveries.get('full').path, created_at: before.created_at, expires_at: null });
       assert.equal((await call(browser(), 'GET', '/share/' + before.token)).status, 200);
+      inherited.last_accessed_at = (db.prepare('SELECT last_accessed_at FROM account_share_links WHERE account_id=?').get(account.id) as any).last_accessed_at;
       assert.equal((await call(alice, 'GET', `/accounts/${account.id}/share-link`)).status, 404);
       const repeated = await call(bob, 'POST', '/accounts/import', { content: line('full') });
       assert.equal(repeated.data.skipped, 1);
@@ -306,6 +308,7 @@ test('version five recognizes complete historical administrator inventory withou
   try {
     await runMigrations(database, ':memory:');
     database.exec(`DELETE FROM schema_migrations WHERE version>=5;
+      DROP TABLE api_keys;
       DELETE FROM settings WHERE key='short_link_length';
       DROP TABLE account_share_links;
       CREATE TABLE account_share_links (

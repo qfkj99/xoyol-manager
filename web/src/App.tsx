@@ -9,6 +9,7 @@ import AuthPage from './pages/AuthPage';
 import Profile from './pages/Profile';
 import Users from './pages/Users';
 import Settings from './pages/Settings';
+import ApiDocs from './pages/ApiDocs';
 import SharedAccount from './pages/SharedAccount';
 import { useAuthStore } from './stores/auth';
 import { FormError } from './components/auth/FormControls';
@@ -27,7 +28,7 @@ window.addEventListener('session-reset', () => {
 function ProtectedRoute({ admin = false }: { admin?: boolean }) {
   const user = useAuthStore(s => s.user);
   const location = useLocation();
-  if (!user) return <Navigate to={`/login?returnTo=${encodeURIComponent(location.pathname + location.search)}`} replace />;
+  if (!user) return <Navigate to={`/login?returnTo=${encodeURIComponent(location.pathname + location.search + location.hash)}`} replace />;
   if (user.must_change_password && location.pathname !== '/profile') return <Navigate to="/profile" replace />;
   if (admin && user.role !== 'admin') return <Navigate to="/dashboard" replace />;
   return <Outlet />;
@@ -44,7 +45,12 @@ function AppRoutes() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/accounts" element={<Accounts />} />
         <Route path="/profile" element={<Profile />} />
-        <Route element={<ProtectedRoute admin />}><Route path="/proxy" element={<ProxySettings />} /><Route path="/users" element={<Users />} /><Route path="/settings" element={<Settings />} /></Route>
+        <Route element={<ProtectedRoute admin />}>
+          <Route path="/proxy" element={<ProxySettings />} />
+          <Route path="/users" element={<Users />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/docs/api" element={<ApiDocs />} />
+        </Route>
       </Route>
     </Route>
     <Route path="*" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />

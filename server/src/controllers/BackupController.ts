@@ -131,6 +131,8 @@ export class BackupController {
           ctx.throw(400, '备份存在跨用户的标签关联');
         }
         staged!.exec('DELETE FROM sessions');
+        // A snapshot must not reactivate a key that was revoked after the backup.
+        staged!.prepare('UPDATE api_keys SET revoked_at=COALESCE(revoked_at,?)').run(Date.now());
         // Restoring a snapshot must never revive previously revoked public links.
         staged!.exec('DELETE FROM account_share_links');
         // Import credentials are also claim credentials; old snapshots must not revive them.

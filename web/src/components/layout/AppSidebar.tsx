@@ -1,7 +1,8 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, Globe, Gamepad2, X, Settings, UserRound } from 'lucide-react';
+import { LayoutDashboard, Users, Globe, Gamepad2, X, Settings, UserRound, BookOpen } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuthStore } from '../../stores/auth';
+import { BrandLogo } from '../BrandLogo';
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: '工作台', admin: false },
@@ -10,6 +11,7 @@ const navItems = [
   { to: '/profile', icon: UserRound, label: '个人中心', admin: false },
   { to: '/users', icon: Users, label: '用户管理', admin: true },
   { to: '/settings', icon: Settings, label: '系统设置', admin: true },
+  { to: '/docs/api', icon: BookOpen, label: 'API 文档', admin: true },
 ];
 
 interface Props {
@@ -31,9 +33,7 @@ export function AppSidebar({ open, onClose }: Props) {
       )}>
         <div className="flex h-14 items-center justify-between px-4 border-b border-border">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-              <Gamepad2 className="h-4 w-4 text-primary-foreground" />
-            </div>
+            <BrandLogo className="h-8 w-8 rounded-lg" alt="" />
             <span className="font-semibold text-foreground">小师妹账号管理平台</span>
           </div>
           <button onClick={onClose} aria-label="关闭导航菜单" className="md:hidden flex h-11 w-11 items-center justify-center rounded-md hover:bg-secondary transition-colors">
