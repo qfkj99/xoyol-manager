@@ -80,6 +80,7 @@ export interface ImportRequest {
   format?: string[];
   placement?: 'owned' | 'pool';
   generate_share_links?: boolean;
+  share_link_expires_in_days?: number | null;
 }
 
 export interface ClaimCode {

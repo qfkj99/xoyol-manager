@@ -8,6 +8,7 @@ import { Account } from '../types';
 import { recordAudit } from '../services/audit';
 import { MailService, validVerificationMailbox } from '../services/MailService';
 import { limitResourceAction, pageNumber, positiveId, resourceError } from '../services/resourceAccess';
+import { shareLinkExpiresAt } from '../services/shareLinks';
 import { verificationCodeCandidates } from '../services/VerificationCodeService';
 import { success } from '../utils/response';
 
@@ -94,12 +95,14 @@ export class ExternalApiController {
 
   async import(ctx: Context) {
     const user = assertApiKey(ctx, 'accounts:import');
-    const body = jsonBody(ctx, ['content', 'placement', 'mode']);
+    const body = jsonBody(ctx, ['content', 'placement', 'mode', 'expires_in_days']);
     if (body.mode !== undefined && !['skip', 'overwrite'].includes(body.mode)) ctx.throw(400, '导入模式仅支持 skip 或 overwrite');
+    shareLinkExpiresAt(body.expires_in_days);
     const origin = publicOrigin(ctx);
     const request = {
       content: body.content, separator: '----', format: importFields,
       placement: body.placement ?? 'owned', mode: body.mode ?? 'skip', generate_share_links: true,
+      share_link_expires_in_days: body.expires_in_days,
     } as const;
     limitResourceAction(user.id, 'account-import', 10, 60_000);
     const result = db.transaction(() => {
@@ -118,7 +121,7 @@ export class ExternalApiController {
           continue;
         }
         if (!account.share_link_enabled) {
-          links.create(user, account.id);
+          links.create(user, account.id, body.expires_in_days);
           account = accounts.getById(user, account.id);
         }
         delivered.push(deliveryAccount(account, origin));

@@ -364,7 +364,7 @@ test('administrator API keys support scoped automation without granting browser 
       assert.equal(invalidLine.data.imported, 0);
       assert.equal(invalidLine.data.errors.length, 1);
       assert.deepEqual(invalidLine.data.accounts, []);
-      assert.equal((await external(fullKey, 'POST', `/accounts/${importedAccount.id}/share-link`, { expires_in_days: 1 })).status, 400);
+      assert.equal((await external(fullKey, 'POST', `/accounts/${importedAccount.id}/share-link`, { expires_in_days: 0 })).status, 400);
     });
 
     await t.test('pending mailbox reads recheck a revoked key before returning any verification code', async () => {

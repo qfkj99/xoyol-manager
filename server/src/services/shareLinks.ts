@@ -7,6 +7,14 @@ export const MIN_SHORT_LINK_LENGTH = 8;
 export const MAX_SHORT_LINK_LENGTH = 64;
 export const SHARE_TOKEN_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
 
+export function shareLinkExpiresAt(expiresInDays: unknown, now = Date.now()): number | null {
+  if (expiresInDays === undefined || expiresInDays === null) return null;
+  if (typeof expiresInDays !== 'number' || !Number.isInteger(expiresInDays) || expiresInDays < 1 || expiresInDays > 3650) {
+    return resourceError(400, '短链有效期必须为 1 至 3650 的整数天数，或 null 表示永久有效');
+  }
+  return now + expiresInDays * 86_400_000;
+}
+
 export function getShortLinkLength(): number {
   const setting = db.prepare("SELECT value FROM settings WHERE key='short_link_length'").get() as { value: string } | undefined;
   const length = setting ? Number(setting.value) : DEFAULT_SHORT_LINK_LENGTH;

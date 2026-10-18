@@ -102,7 +102,7 @@ test('account short links expose only the selected account and remain revocable'
       assert.equal((await call(alice, 'GET', `/accounts/${account.id}/share-link`)).data.enabled, false);
       assert.equal((await call(alice, 'POST', `/accounts/${account.id}/share-link`, {}, false)).status, 403);
       assert.equal((await call(alice, 'POST', `/accounts/${account.id}/share-link`, { expires_in_days: 0 })).status, 400);
-      assert.equal((await call(alice, 'POST', `/accounts/${account.id}/share-link`, { expires_in_days: 365 })).status, 400);
+      assert.equal((await call(alice, 'POST', `/accounts/${account.id}/share-link`, { expires_in_days: 3651 })).status, 400);
       const link = await publish(alice, account.id, 7);
       assert.ok(Date.parse(link.expires_at!) > Date.now() + 6 * 86400_000);
       assert.equal((await call(admin, 'GET', `/accounts/${account.id}/share-link`)).data.path, link.path);

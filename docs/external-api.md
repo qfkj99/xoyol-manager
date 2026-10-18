@@ -46,7 +46,8 @@ POST /api/external/v1/accounts/import
 
 ```json
 {
-  "content": "game001----GamePass123----张三----00123X----game001@outlook.com----MailPass123----your-client-id----your-refresh-token"
+  "content": "game001----GamePass123----张三----00123X----game001@outlook.com----MailPass123----your-client-id----your-refresh-token",
+  "expires_in_days": 7
 }
 ```
 
@@ -63,8 +64,11 @@ POST /api/external/v1/accounts/import
 | `content` | 是 | 八字段文本；单次最多 5000 行、2 MB |
 | `mode` | 否 | 默认 `skip` 跳过已有账号；明确传 `overwrite` 时才覆盖当前发放 Key 的管理员名下记录 |
 | `placement` | 否 | 默认 `owned`，账号归发放 Key 的管理员持有并允许用户导入认领；`pool` 额外生成七天有效的一次性认领码 |
+| `expires_in_days` | 否 | 本批次短链有效天数，支持 1～3650 的整数；`null` 表示永久有效。不传时，新生成或覆盖导入的短链默认永久有效；跳过的已有有效短链保留原到期时间 |
 
 接口自动生成短链，不需要额外传入 `generate_share_links`，也不接受 `owner_user_id`、自定义分隔符和自定义列顺序。
+
+例如，`"expires_in_days": 1` 为一天，`"expires_in_days": 30` 为三十天，`"expires_in_days": null` 为永久有效。有限期从本次导入时起计算，同一批次使用相同设置；该字段只设置短链期限，不改变 API Key 或认领码的期限。字符串（如 `"7"`）、布尔值、小数、零、负数和超过 3650 的天数均返回 `400`，不会写入本批次账号或短链。
 
 成功响应示例（账号 ID、短链和时间仅作示例；实际响应还包含账号状态等字段）：
 
@@ -88,7 +92,7 @@ POST /api/external/v1/accounts/import
         "share_path": "/s/A1b2C3d4E5f6G7h8I9j0Kl",
         "share_url": "https://game.example.com/s/A1b2C3d4E5f6G7h8I9j0Kl",
         "share_link_last_accessed_at": null,
-        "share_link_expires_at": null
+        "share_link_expires_at": "2026-10-25T12:00:00.000Z"
       }
     ],
     "export_content": "game001----GamePass123----张三----00123X----https://game.example.com/s/A1b2C3d4E5f6G7h8I9j0Kl"
@@ -97,11 +101,21 @@ POST /api/external/v1/accounts/import
 }
 ```
 
-`accounts[].share_url` 是完整短链；`export_content` 可直接保存为交付文本，格式为 `游戏账号----游戏密码----name----身份证后六位----短链`，一行一个。
+`accounts[].share_url` 是完整短链；`accounts[].share_link_expires_at` 为实际到期时间，永久有效时为 `null`。`export_content` 可直接保存为交付文本，格式为 `游戏账号----游戏密码----name----身份证后六位----短链`，一行一个。
 
-默认跳过重复项时，若八字段与管理员名下已有记录完全一致，仍在 `accounts` 中返回其交付结果，`imported` 为 0、`skipped` 增加，已有有效链接及其访问记录、到期时间保持不变。若该账号没有有效短链，会生成新链接。若重复资料不一致，跳过该行并在 `errors` 中说明，不返回已有资料或短链。
+默认跳过重复项时，若八字段与管理员名下已有记录完全一致，仍在 `accounts` 中返回其交付结果，`imported` 为 0、`skipped` 增加。即使传入 `expires_in_days`，已有有效链接及其访问记录、到期时间也保持不变，重试导入不会续期。若该账号没有有效短链，会按本次请求的期限生成新链接。若重复资料不一致，跳过该行并在 `errors` 中说明，不返回已有资料或短链。
 
-使用 `overwrite` 时会覆盖管理员自己名下的匹配账号。已有有效短链会保留随机码并改为长期有效；已失效的链接会重新生成。导入中的格式错误按行返回，其他有效行可成功导入；若遇到其他用户名下的账号、游戏账号与邮箱指向不同记录，或多行指向同一记录等归属冲突，则整批返回 `409`，不写入账号或短链。
+使用 `overwrite` 时会覆盖管理员自己名下的匹配账号。已有有效短链保留随机码及访问记录，并按本次请求更新期限；传天数时从本次导入时间重新计算，传 `null` 或不传时改为永久有效。已失效的链接会按本次请求的期限重新生成。导入中的账号格式错误按行返回，其他有效行可成功导入；若遇到其他用户名下的账号、游戏账号与邮箱指向不同记录，或多行指向同一记录等归属冲突，则整批返回 `409`，不写入账号或短链。
+
+将已有账号的短链改为永久有效时，传入完整八字段资料，并明确指定 `overwrite`：
+
+```json
+{
+  "content": "game001----GamePass123----张三----00123X----game001@outlook.com----MailPass123----your-client-id----your-refresh-token",
+  "mode": "overwrite",
+  "expires_in_days": null
+}
+```
 
 API 导入的账号与后台批量导入一致。用户可以导入收到的五字段交付文本或完整八字段资料来认领，认领时保留有效短链及访问状态。
 
@@ -111,14 +125,15 @@ Linux / 宝塔命令示例：先在调用环境设置 `XOYOL_API_KEY`，将域�
 curl --request POST 'https://game.example.com/api/external/v1/accounts/import' \
   --header "Authorization: Bearer ${XOYOL_API_KEY}" \
   --header 'Content-Type: application/json' \
-  --data '{"content":"game001----GamePass123----张三----00123X----game001@outlook.com----MailPass123----your-client-id----your-refresh-token"}'
+  --data '{"content":"game001----GamePass123----张三----00123X----game001@outlook.com----MailPass123----your-client-id----your-refresh-token","expires_in_days":7}'
 ```
 
-批量调用时，把请求保存为 UTF-8 的 `import.json`，然后发送文件：
+上例生成七天有效的短链。批量调用时，把请求保存为 UTF-8 的 `import.json`，然后发送文件；下面示例生成永久有效的短链：
 
 ```json
 {
-  "content": "game001----GamePass123----张三----00123X----game001@outlook.com----MailPass123----client001----refresh001\ngame002----GamePass456----李四----001234----game002@outlook.com----MailPass456----client002----refresh002"
+  "content": "game001----GamePass123----张三----00123X----game001@outlook.com----MailPass123----client001----refresh001\ngame002----GamePass456----李四----001234----game002@outlook.com----MailPass456----client002----refresh002",
+  "expires_in_days": null
 }
 ```
 
@@ -139,7 +154,8 @@ import urllib.request
 request = urllib.request.Request(
     "https://game.example.com/api/external/v1/accounts/import",
     data=json.dumps({
-        "content": "game001----GamePass123----张三----00123X----game001@outlook.com----MailPass123----your-client-id----your-refresh-token"
+        "content": "game001----GamePass123----张三----00123X----game001@outlook.com----MailPass123----your-client-id----your-refresh-token",
+        "expires_in_days": 7,  # 1～3650 天；永久有效改为 None
     }, ensure_ascii=False).encode("utf-8"),
     headers={
         "Authorization": "Bearer " + os.environ["XOYOL_API_KEY"],
@@ -166,7 +182,7 @@ for account in result["accounts"]:
 
 账号列表接受 `page`（默认 1）、`pageSize`（默认 20，最大 200）、`search`（最多 200 字符）、`owner_user_id`（可选归属 ID）、`claim_status`（`assigned` 或 `available`）。返回 `data: {list, total, page, pageSize}`。列表明文包含游戏资料及绑定邮箱，邮箱密码、`client_id` 和刷新令牌使用单个账号详情接口获取。
 
-创建/重置短链需要 JSON 请求体，支持 `{ "expires_in_days": null }`（长期有效）、`7` 或 `30`；也可发送 `{}` 使用长期有效。随机码长度沿用管理员的短链长度设置。成功返回：
+创建/重置短链需要 JSON 请求体，例如 `{ "expires_in_days": 7 }`，支持 1～3650 的整数天数；`{ "expires_in_days": null }` 或 `{}` 表示永久有效。参数校验与导入接口一致。有限期从创建/重置时起计算，重置始终生成新随机码；随机码长度沿用管理员的短链长度设置。成功返回：
 
 ```json
 {
@@ -176,7 +192,7 @@ for account in result["accounts"]:
     "path": "/s/A1b2C3d4E5f6G7h8I9j0Kl",
     "url": "https://game.example.com/s/A1b2C3d4E5f6G7h8I9j0Kl",
     "created_at": "2026-10-18 12:00:00",
-    "expires_at": null,
+    "expires_at": "2026-10-25T12:00:00.000Z",
     "last_accessed_at": null
   },
   "message": "ok"

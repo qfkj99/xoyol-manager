@@ -85,7 +85,7 @@ export default function ApiKeySettings({ onChange }: { onChange: () => void | Pr
     `curl -X POST "${apiRoot}/accounts/import" \\`,
     '  -H "Authorization: Bearer YOUR_API_KEY" \\',
     '  -H "Content-Type: application/json" \\',
-    `  --data-raw '${JSON.stringify({ content: '游戏账号----游戏密码----name----身份证后六位----邮箱----邮箱密码----client_id----刷新令牌' })}'`,
+    `  --data-raw '${JSON.stringify({ content: '游戏账号----游戏密码----name----身份证后六位----邮箱----邮箱密码----client_id----刷新令牌', expires_in_days: 7 })}'`,
   ].join('\n');
 
   const create = async (event: FormEvent) => {
@@ -207,7 +207,7 @@ export default function ApiKeySettings({ onChange }: { onChange: () => void | Pr
       <div className="min-w-0 space-y-5 border-t border-border p-4">
         <div className="space-y-2"><p className="text-sm font-medium">API 根地址</p><p className="select-all rounded-md bg-secondary p-3 font-mono text-xs leading-6 [overflow-wrap:anywhere]">{apiRoot}</p><button type="button" className="button-secondary" onClick={() => void copyText(apiRoot, 'API 根地址')}><Copy size={16} aria-hidden="true" />复制根地址</button></div>
         <p className="text-sm leading-7 text-muted-foreground">请求头使用 <code className="[overflow-wrap:anywhere]">Authorization: Bearer YOUR_API_KEY</code>，将占位符替换为完整密钥。请求和响应均使用 JSON。</p>
-        <div className="space-y-3"><h3 className="text-sm font-medium">导入并生成短链（Bash / curl）</h3><p className="text-xs leading-6 text-muted-foreground">content 按八项格式传入，一行一个账号；批量导入使用换行符分隔。成功结果包含各账号的 share_url，可直接使用。</p><pre className="min-w-0 whitespace-pre-wrap rounded-md bg-secondary p-3 text-xs leading-6 [overflow-wrap:anywhere]"><code>{importExample}</code></pre><button type="button" className="button-secondary" onClick={() => void copyText(importExample, '调用示例')}><Copy size={16} aria-hidden="true" />复制调用示例</button></div>
+        <div className="space-y-3"><h3 className="text-sm font-medium">导入并生成短链（Bash / curl）</h3><p className="text-xs leading-6 text-muted-foreground">content 按八项格式传入，一行一个账号；批量导入使用换行符分隔。expires_in_days 设置本批次短链有效期，支持 1～3650 的整数天数，null 为永久有效；不传时新生成或覆盖导入的短链默认永久有效。跳过已有有效链接时保留原期限。成功结果包含 share_url 和 share_link_expires_at。</p><pre className="min-w-0 whitespace-pre-wrap rounded-md bg-secondary p-3 text-xs leading-6 [overflow-wrap:anywhere]"><code>{importExample}</code></pre><button type="button" className="button-secondary" onClick={() => void copyText(importExample, '调用示例')}><Copy size={16} aria-hidden="true" />复制调用示例</button></div>
         <div className="space-y-3"><h3 className="text-sm font-medium">可用接口与权限</h3><ul className="divide-y divide-border rounded-md border border-border">{endpointRows.map(endpoint => <li key={`${endpoint.method} ${endpoint.path}`} className="min-w-0 space-y-1 p-3"><p className="font-mono text-xs leading-6 [overflow-wrap:anywhere]"><span className="mr-2 font-semibold">{endpoint.method}</span>{endpoint.path}</p><p className="text-xs leading-6 text-muted-foreground">{endpoint.description} · 权限：<code className="[overflow-wrap:anywhere]">{endpoint.scope}</code></p></li>)}</ul><p className="text-xs leading-6 text-muted-foreground">路径中的 :id 替换为账号 ID。重置短链后旧链接立即失效；接口遵循管理员设置的短链长度。</p></div>
       </div>
     </details>

@@ -4,7 +4,7 @@ import { AuthUser } from '../types/auth';
 import { AccountModel } from './Account';
 import { publicUser, userModel } from './User';
 import { requireActiveOwner, resourceError } from '../services/resourceAccess';
-import { generateUniqueShareToken, SHARE_TOKEN_PATTERN } from '../services/shareLinks';
+import { generateUniqueShareToken, shareLinkExpiresAt, SHARE_TOKEN_PATTERN } from '../services/shareLinks';
 
 const accounts = new AccountModel();
 export { SHARE_TOKEN_PATTERN } from '../services/shareLinks';
@@ -48,12 +48,9 @@ export class ShareLinkModel {
   }
 
   create(user: AuthUser, accountId: number, expiresInDays?: unknown): ShareLinkInfo {
-    if (expiresInDays !== undefined && expiresInDays !== null && expiresInDays !== 7 && expiresInDays !== 30) {
-      resourceError(400, '有效期仅支持 7 天、30 天或长期有效');
-    }
+    const expiresAt = shareLinkExpiresAt(expiresInDays);
     const account = accounts.getById(user, accountId);
     const ownerId = requireActiveOwner(account.owner_user_id);
-    const expiresAt = expiresInDays == null ? null : Date.now() + Number(expiresInDays) * 86_400_000;
     return db.transaction(() => {
       const token = generateUniqueShareToken();
       db.prepare('DELETE FROM account_share_links WHERE account_id=?').run(accountId);

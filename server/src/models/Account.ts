@@ -4,7 +4,7 @@ import { Account, ClaimCode, PaginatedResponse, ImportRequest, ImportResult, Imp
 import { AuthUser } from '../types/auth';
 import { TagModel } from './Tag';
 import { assertResourcesIdle, createOwner, idList, ownerScope, ownerWhere, requireActiveOwner, requireResource, resourceError } from '../services/resourceAccess';
-import { generateUniqueShareToken, SHARE_TOKEN_PATTERN } from '../services/shareLinks';
+import { generateUniqueShareToken, shareLinkExpiresAt, SHARE_TOKEN_PATTERN } from '../services/shareLinks';
 
 const tagModel = new TagModel();
 const legacyImportFields = ['email', 'password', 'client_id', 'refresh_token'];
@@ -150,8 +150,12 @@ function importOwner(user: AuthUser, req: ImportRequest & { owner_user_id?: numb
 function validateImportOptions(user: AuthUser, req: ImportRequest & { owner_user_id?: number; mode?: string }) {
   if (req.generate_share_links !== undefined && typeof req.generate_share_links !== 'boolean') resourceError(400, '生成短链选项无效');
   if (user.role !== 'admin') {
-    if (req.owner_user_id !== undefined || req.placement !== undefined || req.generate_share_links !== undefined) resourceError(403, '仅支持导入管理员已录入的账号');
+    if (req.owner_user_id !== undefined || req.placement !== undefined || req.generate_share_links !== undefined || req.share_link_expires_in_days !== undefined) resourceError(403, '仅支持导入管理员已录入的账号');
     if (req.mode === 'overwrite') resourceError(400, '用户导入不会覆盖账号，请使用跳过重复项模式');
+  }
+  if (req.share_link_expires_in_days !== undefined) {
+    shareLinkExpiresAt(req.share_link_expires_in_days);
+    if (!req.generate_share_links) resourceError(400, '设置短链有效期时必须同时生成短链');
   }
 }
 
@@ -211,18 +215,18 @@ function claimImportAccount(user: AuthUser, record: ClaimImportRecord): Account 
   return account;
 }
 
-function importShareExport(id: number): ImportShareExport {
+function importShareExport(id: number, expiresAt: number | null): ImportShareExport {
   const account = db.prepare('SELECT * FROM accounts WHERE id=?').get(id) as Account;
   requireActiveOwner(account.owner_user_id);
   let link = db.prepare('SELECT token,owner_user_id,expires_at FROM account_share_links WHERE account_id=?').get(id) as { token: string; owner_user_id: number; expires_at: number | null } | undefined;
   if (!link || link.owner_user_id !== account.owner_user_id || (link.expires_at !== null && link.expires_at <= Date.now())) {
     const token = generateUniqueShareToken();
     db.prepare('DELETE FROM account_share_links WHERE account_id=?').run(id);
-    db.prepare('INSERT INTO account_share_links (account_id,token,owner_user_id,expires_at) VALUES (?,?,?,NULL)').run(id, token, account.owner_user_id);
-    link = { token, owner_user_id: account.owner_user_id!, expires_at: null };
-  } else if (link.expires_at !== null) {
-    // Batch delivery always produces lasting links, preserving an existing token.
-    db.prepare('UPDATE account_share_links SET expires_at=NULL WHERE account_id=?').run(id);
+    db.prepare('INSERT INTO account_share_links (account_id,token,owner_user_id,expires_at) VALUES (?,?,?,?)').run(id, token, account.owner_user_id, expiresAt);
+    link = { token, owner_user_id: account.owner_user_id!, expires_at: expiresAt };
+  } else if (link.expires_at !== expiresAt) {
+    // Overwriting a delivery updates its lifetime while preserving the URL and visits.
+    db.prepare('UPDATE account_share_links SET expires_at=? WHERE account_id=?').run(expiresAt, id);
   }
   return { game_account: account.game_account, game_password: account.game_password, real_name: account.real_name, id_last_six: account.id_last_six, path: `/s/${link.token}` };
 }
@@ -323,6 +327,7 @@ export class AccountModel {
     if (req.generate_share_links && records.some(record => gameFields.some(field => !record.data[field]))) resourceError(400, '生成交付短链需要完整的游戏账号信息');
     let imported = 0, skipped = 0;
     return db.transaction(() => {
+      const shareExpiresAt = shareLinkExpiresAt(req.share_link_expires_in_days);
       const planned = records.map(record => ({ ...record, existing: matchingAccount(record.data) }));
       if (planned.some(record => record.existing && record.existing.owner_user_id !== owner)) resourceError(409, '导入包含无法操作的账号，请核对输入或联系管理员；未写入任何数据');
       const existingIds = planned.flatMap(record => record.existing ? [record.existing.id] : []);
@@ -349,7 +354,7 @@ export class AccountModel {
       }
       return { imported, skipped, errors,
         ...(req.placement === 'pool' ? { claim_codes: importedIds.length ? this.publishClaims(user, importedIds) : [] } : {}),
-        ...(req.generate_share_links ? { share_exports: importedIds.map(id => importShareExport(id)) } : {}),
+        ...(req.generate_share_links ? { share_exports: importedIds.map(id => importShareExport(id, shareExpiresAt)) } : {}),
       };
     }).immediate();
   }

@@ -320,6 +320,8 @@ npm test
 
 管理员在「系统设置 → 外部 API」生成 Key，完整 Key 仅显示一次。外部程序发送 `Authorization: Bearer <API Key>`，调用 `/api/external/v1` 下的接口，无需登录 Cookie 或 CSRF Token。只勾选「导入账号」权限即可调用 `POST /api/external/v1/accounts/import`，请求 `{ "content": "游戏账号----游戏密码----name----身份证后六位----邮箱----邮箱密码----client_id----刷新令牌" }`，响应 `data.accounts[].share_url` 为完整短链，`data.export_content` 为五字段交付文本。多行账号使用 `\n` 分隔。
 
+导入请求可加 `"expires_in_days": 7` 设置本批次短链有效期，支持 1～3650 的整数天数；传 `null` 为永久有效。不传时，新生成或覆盖导入的短链默认永久有效。默认 `skip` 模式下，已有有效短链保留原期限及访问记录；需更新已有链接期限时使用 `mode: "overwrite"`，有效链接的随机码保留，有限期从本次导入时起重新计算。响应 `share_link_expires_at` 返回实际到期时间，永久有效为 `null`。
+
 另支持账号查询、完整资料读取、短链查看/重置/关闭和双文件夹验证码获取。Key 可设置权限、到期时间、随时撤销，后台显示创建人及最近使用时间。完整字段说明、批量导入、curl 与 Python 示例见 [外部 API 调用文档](docs/external-api.md)。Docker 更新后启动会自动迁移数据库；完整短链使用 `.env` 的 `APP_ORIGIN`，Key 无需写入 `.env`。
 
 后台管理 Key 的接口为 `GET /api/api-keys`（列表）、`POST /api/api-keys`（生成）和 `DELETE /api/api-keys/:id`（撤销），继续使用管理员登录会话和写操作 CSRF 校验，API Key 本身不能管理其他 Key。
@@ -365,7 +367,7 @@ npm test
 | POST | `/claim-pool/revoke` | 管理员撤销尚未使用的认领码 |
 | POST | `/claim` | 用户提交 `{code}` 原子认领一个账号 |
 | GET | `/:id/share-link` | 所属用户或管理员查看账号短链状态及当前链接 |
-| POST | `/:id/share-link` | 创建或重置账号短链，可选 `{expires_in_days: null \| 7 \| 30}` |
+| POST | `/:id/share-link` | 创建或重置账号短链，可选 `expires_in_days`：1～3650 的整数天数，`null` 或不传为永久有效 |
 | DELETE | `/:id/share-link` | 关闭账号短链 |
 
 ### 公开短链 `/api/share`
@@ -428,7 +430,7 @@ game001----GamePass123----张三----00123X----game001@outlook.com----MailPass123
 game001----GamePass123----张三----00123X----https://your-site.example/s/随机码
 ```
 
-批量生成的链接长期有效。仅为本次成功新增或覆盖的账号生成交付结果，跳过项和失败项没有输出；覆盖已有账号时复用仍有效的链接，并将其期限设为长期有效，已失效的链接会重新生成。批量交付需要完整的游戏账号四项资料。API 在管理员导入请求中接受 `generate_share_links: true`，响应 `share_exports` 数组包含 `game_account`、`game_password`、`real_name`、`id_last_six`、`path`；`path` 是 `/s/随机码` 相对路径，网页使用当前站点地址组合为完整短链后导出。未勾选时不生成交付结果。
+后台页面批量生成的链接默认长期有效。仅为本次成功新增或覆盖的账号生成交付结果，跳过项和失败项没有输出；覆盖已有账号时复用仍有效的链接，未指定期限时将其设为长期有效，已失效的链接会重新生成。批量交付需要完整的游戏账号四项资料。API 在管理员导入请求中接受 `generate_share_links: true`，响应 `share_exports` 数组包含 `game_account`、`game_password`、`real_name`、`id_last_six`、`path`；`path` 是 `/s/随机码` 相对路径，网页使用当前站点地址组合为完整短链后导出。未勾选时不生成交付结果。外部 API 可通过 `expires_in_days` 自定义短链期限，参数及重复导入规则见[外部 API 调用文档](docs/external-api.md)。
 
 普通用户的“导入账号”即认领：可粘贴上述五字段短链文本，或完整八字段资料。账号必须已经由管理员在后台批量导入、仍归有效管理员持有且尚未被其他用户认领；提交资料需与后台记录匹配，五字段格式还要求短链有效。普通用户不能新增任意账号或通过导入覆盖资料；后台不存在、资料不匹配或已被他人认领的行会报错，重复导入自己名下的账号会跳过。导入后账号及邮箱缓存转入该用户，原标签关联清除；有效短链随账号转交，保留原网址、创建时间和有效期，用户点击“短链”即可查看、复制和管理。一次性导入码接收账号也保留有效短链。已关闭、过期或已被旧版本导入流程删除的短链不会自动恢复。
 
