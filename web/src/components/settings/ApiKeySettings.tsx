@@ -85,7 +85,7 @@ export default function ApiKeySettings({ onChange }: { onChange: () => void | Pr
     `curl -X POST "${apiRoot}/accounts/import" \\`,
     '  -H "Authorization: Bearer YOUR_API_KEY" \\',
     '  -H "Content-Type: application/json" \\',
-    `  --data-raw '${JSON.stringify({ content: '游戏账号----游戏密码----name----身份证后六位----邮箱----邮箱密码----client_id----刷新令牌', expires_in_days: 7 })}'`,
+    `  --data-raw '${JSON.stringify({ content: '游戏账号----游戏密码----name----后六位----邮箱----邮箱密码----client_id----刷新令牌', expires_in_days: 7 })}'`,
   ].join('\n');
 
   const create = async (event: FormEvent) => {

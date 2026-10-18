@@ -11,7 +11,7 @@ test('verification codes require context, preserve leading zeros, and use the ne
     { mail_id: 'cn', subject: '游戏登录', text_content: '订单号：123456，您的验证码为：001234，请勿透露。', mail_date: '2026-10-17T11:59:00Z' },
     { mail_id: 'en', subject: 'Security code: AB12CD', mail_date: '2026-10-17T11:58:00Z' },
     { mail_id: 'before', subject: '876543 is your verification code', mail_date: '2026-10-17T11:40:00Z' },
-    { mail_id: 'order', subject: '订单123456已完成', text_content: '身份证 123456789012345678 日期 2026-10-17' },
+    { mail_id: 'order', subject: '订单123456已完成', text_content: '编号 123456789012345678 日期 2026-10-17' },
     { mail_id: 'date', subject: '验证码于 2026-10-17 发送', text_content: '本邮件不含号码' },
     { mail_id: 'cn', subject: '游戏登录', text_content: '验证码：001234', mail_date: '2026-10-17T11:59:00Z' },
   ];

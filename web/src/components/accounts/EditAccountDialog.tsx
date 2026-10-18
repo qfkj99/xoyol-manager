@@ -36,7 +36,7 @@ export default function EditAccountDialog({ open, account, onClose, onSave, tags
 
   const handleSave = async () => {
     if (!form.game_account.trim() || !form.email.trim()) { setError('请填写游戏账号和绑定微软邮箱。'); return; }
-    if (form.id_last_six && !/^\d{5}[\dXx]$/.test(form.id_last_six)) { setError('身份证后六位应为 5 位数字加 1 位数字或 X。'); return; }
+    if (form.id_last_six && !/^\d{5}[\dXx]$/.test(form.id_last_six)) { setError('后六位应为 5 位数字加 1 位数字或 X。'); return; }
     setSaving(true); setError('');
     try {
       await onSave(form);
@@ -51,7 +51,7 @@ export default function EditAccountDialog({ open, account, onClose, onSave, tags
   return (
     <Modal title={account ? '编辑游戏账号' : '新增游戏账号'} description="游戏登录信息将以明文显示在账号列表中；绑定邮箱用于获取登录验证码。" onClose={onClose} busy={saving}>
         <fieldset disabled={saving} className="space-y-3">
-          <div className="grid gap-3 sm:grid-cols-2">{([['game_account', '游戏账号'], ['game_password', '游戏密码'], ['real_name', 'name / 姓名'], ['id_last_six', '身份证后六位']] as const).map(([field, label]) => <div key={field}><label htmlFor={`edit-${field}`} className="form-label mb-1 block">{label}</label><input id={`edit-${field}`} className="form-input font-mono" autoComplete="off" value={form[field]} onChange={e => setForm(current => ({ ...current, [field]: e.target.value }))} maxLength={field === 'id_last_six' ? 6 : undefined} placeholder={field === 'id_last_six' ? '例如 12345X' : label} /></div>)}</div>
+          <div className="grid gap-3 sm:grid-cols-2">{([['game_account', '游戏账号'], ['game_password', '游戏密码'], ['real_name', 'name / 姓名'], ['id_last_six', '后六位']] as const).map(([field, label]) => <div key={field}><label htmlFor={`edit-${field}`} className="form-label mb-1 block">{label}</label><input id={`edit-${field}`} className="form-input font-mono" autoComplete="off" value={form[field]} onChange={e => setForm(current => ({ ...current, [field]: e.target.value }))} maxLength={field === 'id_last_six' ? 6 : undefined} placeholder={field === 'id_last_six' ? '例如 12345X' : label} /></div>)}</div>
           <div>
             <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">绑定微软邮箱</label>
             <input

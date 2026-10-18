@@ -54,10 +54,10 @@ POST /api/external/v1/accounts/import
 `content` 每行一个账号，多行用 JSON 的 `\n` 分隔，固定八字段顺序如下：
 
 ```text
-游戏账号----游戏密码----name----身份证后六位----邮箱----邮箱密码----client_id----刷新令牌
+游戏账号----游戏密码----name----后六位----邮箱----邮箱密码----client_id----刷新令牌
 ```
 
-字段本身不能包含 `----` 或换行。身份证后六位作为字符串保存，保留前导零，末位支持 `X`。`name` 在响应中对应 `real_name`，邮箱密码对应 `password`。
+字段本身不能包含 `----` 或换行。后六位作为字符串保存，保留前导零，末位支持 `X`。`name` 在响应中对应 `real_name`，邮箱密码对应 `password`。
 
 | 请求字段 | 必填 | 说明 |
 | --- | --- | --- |
@@ -101,7 +101,7 @@ POST /api/external/v1/accounts/import
 }
 ```
 
-`accounts[].share_url` 是完整短链；`accounts[].share_link_expires_at` 为实际到期时间，永久有效时为 `null`。`export_content` 可直接保存为交付文本，格式为 `游戏账号----游戏密码----name----身份证后六位----短链`，一行一个。
+`accounts[].share_url` 是完整短链；`accounts[].share_link_expires_at` 为实际到期时间，永久有效时为 `null`。`export_content` 可直接保存为交付文本，格式为 `游戏账号----游戏密码----name----后六位----短链`，一行一个。
 
 默认跳过重复项时，若八字段与管理员名下已有记录完全一致，仍在 `accounts` 中返回其交付结果，`imported` 为 0、`skipped` 增加。即使传入 `expires_in_days`，已有有效链接及其访问记录、到期时间也保持不变，重试导入不会续期。若该账号没有有效短链，会按本次请求的期限生成新链接。若重复资料不一致，跳过该行并在 `errors` 中说明，不返回已有资料或短链。
 

@@ -88,7 +88,7 @@ function accountInput(data: Partial<Account> & { email_password?: string }, crea
     if (((creating && hasGame) || result[key] !== undefined) && !result[key]?.trim()) resourceError(400, `${key} 不能为空`);
   }
   if (result.id_last_six !== undefined) {
-    if (!/^\d{5}[\dXx]$/.test(result.id_last_six)) resourceError(400, '身份证后六位应为 6 位数字，末位可以为 X');
+    if (!/^\d{5}[\dXx]$/.test(result.id_last_six)) resourceError(400, '后六位应为 6 位数字，末位可以为 X');
     result.id_last_six = result.id_last_six.toUpperCase();
   }
   if (result.game_account?.includes('----')) resourceError(400, '游戏账号不能包含导入分隔符');
@@ -107,7 +107,7 @@ function parseImport(req: ImportRequest) {
   // Existing four-column mailbox imports remain usable while records are completed.
   const format = req.format ?? (lines[0].split(separator).length === 4 ? legacyImportFields : importFields);
   if (!Array.isArray(format) || format.length > 8 || new Set(format).size !== format.length || format.some(field => !importFields.includes(field)) || !['email', 'client_id', 'refresh_token'].every(field => format.includes(field))) resourceError(400, '导入字段必须包含 email、client_id 和 refresh_token，且不能重复');
-  if (gameFields.some(field => format.includes(field)) && !gameFields.every(field => format.includes(field))) resourceError(400, '游戏账号导入必须包含游戏账号、游戏密码、姓名和身份证后六位');
+  if (gameFields.some(field => format.includes(field)) && !gameFields.every(field => format.includes(field))) resourceError(400, '游戏账号导入必须包含游戏账号、游戏密码、姓名和后六位');
   if (lines.length > 5000) resourceError(400, '单次最多导入 5000 条账号');
   const records: { line: number; data: Partial<Account> }[] = [], errors: string[] = [];
   const seenEmails = new Set<string>(), seenGames = new Set<string>();
@@ -402,7 +402,7 @@ export class AccountModel {
     return db.transaction(() => {
       const accounts = ids.map(id => this.getById(user, id)); assertResourcesIdle(ids);
       if (accounts.some(account => account.owner_user_id !== user.id)) resourceError(400, '请先将账号移交到自己名下，再发布认领码');
-      if (accounts.some(account => gameFields.some(key => !account[key]))) resourceError(400, '请补全游戏账号、游戏密码、姓名和身份证后六位后再发布');
+      if (accounts.some(account => gameFields.some(key => !account[key]))) resourceError(400, '请补全游戏账号、游戏密码、姓名和后六位后再发布');
       const update = db.prepare("UPDATE accounts SET claim_status='available', claim_code_hash=?, claim_code_expires_at=?, updated_at=CURRENT_TIMESTAMP WHERE id=?");
       return accounts.map(account => {
         const code = randomBytes(18).toString('hex').toUpperCase().match(/.{1,6}/g)!.join('-');
